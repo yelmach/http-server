@@ -14,6 +14,7 @@ public class Server {
     private ServerSocketChannel serverSocket;
 
     public void start(int port) throws IOException {
+
         selector = Selector.open();
         serverSocket = ServerSocketChannel.open();
 

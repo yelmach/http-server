@@ -15,7 +15,7 @@ public class ClientHandler {
         this.client = clientChannel;
         this.selectionKey = selectionKey;
 
-        this.buffer = ByteBuffer.allocate(256);
+        this.buffer = ByteBuffer.allocate(1024);
     }
 
     public void read() throws IOException {

@@ -1,15 +1,26 @@
+import core.Server;
 import java.io.IOException;
 
-import core.Server;
+import config.ConfigLoader;
+import config.ServerConfig;
 
 public class Main {
 
+    final static String configFileName = "config.properties";
+
     public static void main(String[] args) {
-        Server server = new Server();
         try {
-            server.start(8080);
+
+            ServerConfig config = ConfigLoader.load(configFileName);
+
+            System.out.println("configuration loaded");
+            System.out.println(config.toString());
+
+            Server server = new Server();
+            server.start(config.getPort());
+
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Server failed to start: " + e.getMessage());
         }
     }
 }
