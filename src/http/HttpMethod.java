@@ -1,5 +1,7 @@
 package http;
 
+import exceptions.InvalidMethodException;
+
 public enum HttpMethod {
     GET, POST, DELETE;
 
