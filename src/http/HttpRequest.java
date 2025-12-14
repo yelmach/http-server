@@ -8,6 +8,7 @@ public class HttpRequest {
     private String httpVersion;
     private HttpHeaders headers;
     private byte[] body;
+    private String QueryString;
 
     public HttpRequest() {
         this.headers = new HttpHeaders();
@@ -59,5 +60,13 @@ public class HttpRequest {
 
     public void setBody(byte[] body) {
         this.body = body;
+    }
+
+    public String getQueryString() {
+        return QueryString;
+    }
+
+    public void setQueryString(String queryString) {
+        QueryString = queryString;
     }
 }
