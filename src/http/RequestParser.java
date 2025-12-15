@@ -3,6 +3,7 @@ package http;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import exceptions.InvalidMethodException;
 
@@ -12,7 +13,6 @@ public class RequestParser {
         PARSING_REQUEST_LINE,
         PARSING_HEADERS,
         PARSING_BODY_FIXED_LENGTH,
-        PARSING_BODY_CHUNKED,
         PARSING_CHUNK_SIZE,
         PARSING_CHUNK_DATA,
         PARSING_CHUNK_TRAILER,
@@ -26,10 +26,9 @@ public class RequestParser {
     private final int maxBodySize;
 
     private State currentState;
-    private HttpRequest HttpRequest;
+    private HttpRequest httpRequest;
     private ByteArrayOutputStream accumulationBuffer;
 
-    private int headerBytesRead;
     private int bodyBytesRead;
     private int expectedBodyLength;
 
@@ -51,9 +50,8 @@ public class RequestParser {
 
     public void reset() {
         currentState = State.PARSING_REQUEST_LINE;
-        HttpRequest = new HttpRequest();
+        httpRequest = new HttpRequest();
         accumulationBuffer.reset();
-        headerBytesRead = 0;
         bodyBytesRead = 0;
         expectedBodyLength = 0;
         currentChunkSize = 0;
@@ -101,7 +99,48 @@ public class RequestParser {
                     break;
 
                 case PARSING_HEADERS:
+                    int headersEnd = findHeadersEnd(data, position);
+                    if (headersEnd == -1) {
+                        if (data.length - position > MAX_HEADER_SIZE) {
+                            return error("Headers exceed maximum size of " + MAX_HEADER_SIZE);
+                        }
+
+                        keepUnprocessedData(data, position);
+                        return ParsingResult.needMoreData();
+                    }
+
+                    if (!parseHeaders(data, position, headersEnd)) {
+                        currentState = State.ERROR;
+                        return ParsingResult.error(errorMessage);
+                    }
+
+                    position = headersEnd + 4; // Skip \r\n\r\n
+
+                    String error = httpRequest.getHeaders().validate();
+                    if (error != null) {
+                        return error("Header validation failed: " + error);
+                    }
+
+                    if (httpRequest.getHeaders().isChunked()) {
+                        currentState = State.PARSING_CHUNK_SIZE;
+                    } else {
+                        expectedBodyLength = httpRequest.getHeaders().getContentLength();
+
+                        if (expectedBodyLength > maxBodySize) {
+                            return error("Request body size " + expectedBodyLength +
+                                    " exceeds maximum " + maxBodySize);
+                        }
+
+                        if (expectedBodyLength > 0) {
+                            currentState = State.PARSING_BODY_FIXED_LENGTH;
+                        } else {
+                            currentState = State.COMPLETE;
+                            accumulationBuffer.reset();
+                            return ParsingResult.complete(httpRequest);
+                        }
+                    }
                     break;
+
                 case PARSING_BODY_FIXED_LENGTH:
                     break;
                 case PARSING_CHUNK_SIZE:
@@ -115,7 +154,7 @@ public class RequestParser {
             }
         }
 
-        return ParsingResult.complete(HttpRequest);
+        return ParsingResult.complete(httpRequest);
     }
 
     private boolean parseRequestLine(String line) {
@@ -131,7 +170,7 @@ public class RequestParser {
         }
 
         try {
-            HttpRequest.setMethod(HttpMethod.fromString(parts[0]));
+            httpRequest.setMethod(HttpMethod.fromString(parts[0]));
         } catch (InvalidMethodException e) {
             errorMessage = e.getMessage();
             return false;
@@ -151,11 +190,11 @@ public class RequestParser {
 
         int queryIndex = uri.indexOf('?');
         if (queryIndex == -1) {
-            HttpRequest.setPath(uri);
-            HttpRequest.setQueryString(null);
+            httpRequest.setPath(uri);
+            httpRequest.setQueryString(null);
         } else {
-            HttpRequest.setPath(uri.substring(0, queryIndex));
-            HttpRequest.setQueryString(uri.substring(queryIndex + 1));
+            httpRequest.setPath(uri.substring(0, queryIndex));
+            httpRequest.setQueryString(uri.substring(queryIndex + 1));
         }
 
         String version = parts[2];
@@ -164,7 +203,41 @@ public class RequestParser {
             return false;
         }
 
-        HttpRequest.setHttpVersion(version);
+        httpRequest.setHttpVersion(version);
+
+        return true;
+    }
+
+    private boolean parseHeaders(byte[] data, int start, int end) {
+        int position = start;
+
+        // TODO: Handle multi-line headers starting with space/tab
+        while (position < end) {
+            int lineEnd = findLineEnd(data, position);
+            if (lineEnd == -1) {
+                break;
+            }
+
+            String headerLine = new String(data, position, lineEnd - position, StandardCharsets.UTF_8);
+
+            int colonIndex = headerLine.indexOf(':');
+            if (colonIndex == -1) {
+                errorMessage = "Invalid header format (missing colon): " + headerLine;
+                return false;
+            }
+
+            String name = headerLine.substring(0, colonIndex).trim();
+            String value = headerLine.substring(colonIndex + 1).trim();
+
+            if (name.isEmpty()) {
+                errorMessage = "Empty header name";
+                return false;
+            }
+
+            httpRequest.getHeaders().add(name, value);
+
+            position = lineEnd + 2; // Skip \r\n
+        }
 
         return true;
     }
@@ -179,7 +252,7 @@ public class RequestParser {
         return -1;
     }
 
-    private int findHeaderEnd(byte[] data, int startPos) {
+    private int findHeadersEnd(byte[] data, int startPos) {
         for (int i = startPos; i < data.length - 3; i++) {
             if (data[i] == '\r' && data[i + 1] == '\n' && data[i + 2] == '\r' && data[i + 3] == '\n') {
                 return i;
@@ -189,7 +262,7 @@ public class RequestParser {
         return -1;
     }
 
-    private void KeepUnprocessedData(byte[] data, int startPos) {
+    private void keepUnprocessedData(byte[] data, int startPos) {
         accumulationBuffer.reset();
 
         if (startPos < data.length) {

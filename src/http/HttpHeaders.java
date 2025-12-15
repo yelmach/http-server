@@ -47,4 +47,22 @@ public class HttpHeaders {
             return -1;
         }
     }
+
+    public boolean isChunked() {
+        String value = get("Transfer-Encoding");
+        return value != null &&
+                value.toLowerCase().contains("chunked");
+    }
+
+    public String validate() {
+        if (!has("host")) {
+            return "Missing required Host header";
+        }
+
+        if (has("content-length") && getContentLength() < 0) {
+            return "Invalid Content value";
+        }
+
+        return null;
+    }
 }
