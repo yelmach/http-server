@@ -3,7 +3,6 @@ package http;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 import exceptions.InvalidMethodException;
 
@@ -28,6 +27,7 @@ public class RequestParser {
     private State currentState;
     private HttpRequest httpRequest;
     private ByteArrayOutputStream accumulationBuffer;
+    private ByteArrayOutputStream bodyStream;
 
     private int bodyBytesRead;
     private int expectedBodyLength;
@@ -166,11 +166,96 @@ public class RequestParser {
                     }
 
                 case PARSING_CHUNK_SIZE:
+                    int chunkSizeLineEnd = findLineEnd(data, position);
+                    if (chunkSizeLineEnd == -1) {
+                        removeProcessedData(data, position);
+                        return ParsingResult.needMoreData();
+                    }
+
+                    String chunkSizeLine = new String(data, position, chunkSizeLineEnd - position,
+                            StandardCharsets.UTF_8).trim();
+
+                    try {
+                        int semicolonIndex = chunkSizeLine.indexOf(';');
+                        if (semicolonIndex != -1) {
+                            chunkSizeLine = chunkSizeLine.substring(0, semicolonIndex);
+                        }
+
+                        currentChunkSize = Integer.parseInt(chunkSizeLine.trim(), 16);
+
+                        if (currentChunkSize < 0) {
+                            return error("Invalid chunk size: " + currentChunkSize);
+                        }
+                    } catch (NumberFormatException e) {
+                        return error("Invalid chunk size format: " + chunkSizeLine);
+                    }
+
+                    position = chunkSizeLineEnd + 2;
+
+                    if (currentChunkSize == 0) {
+                        currentState = State.PARSING_CHUNK_TRAILER;
+                    } else {
+                        currentState = State.PARSING_CHUNK_DATA;
+                        currentChunkBytesRead = 0;
+                    }
                     break;
+
                 case PARSING_CHUNK_DATA:
+                    int remainingChunkBytes = currentChunkSize - currentChunkBytesRead;
+                    int availableChunkBytes = data.length - position;
+                    int chunkBytesToRead = Math.min(remainingChunkBytes, availableChunkBytes);
+
+                    if (chunkBytesToRead > 0) {
+                        if (bodyStream == null) {
+                            bodyStream = new ByteArrayOutputStream();
+                        }
+                        bodyStream.write(data, position, chunkBytesToRead);
+
+                        currentChunkBytesRead += chunkBytesToRead;
+                        bodyBytesRead += chunkBytesToRead;
+                        position += chunkBytesToRead;
+
+                        if (bodyBytesRead > maxBodySize) {
+                            return error("Chunked body size exceeds maximum " + maxBodySize);
+                        }
+                    }
+
+                    if (currentChunkBytesRead >= currentChunkSize) {
+                        if (position + 2 > data.length) {
+                            removeProcessedData(data, position);
+                            return ParsingResult.needMoreData();
+                        }
+
+                        if (data[position] != '\r' || data[position + 1] != '\n') {
+                            return error("Expected CRLF after chunk data");
+                        }
+
+                        position += 2;
+                        currentState = State.PARSING_CHUNK_SIZE;
+                    } else {
+                        removeProcessedData(data, position);
+                        return ParsingResult.needMoreData();
+                    }
                     break;
+
                 case PARSING_CHUNK_TRAILER:
-                    break;
+                    if (position + 2 > data.length) {
+                        removeProcessedData(data, position);
+                        return ParsingResult.needMoreData();
+                    }
+
+                    if (data[position] != '\r' || data[position + 1] != '\n') {
+                        return error("Expected CRLF after final chunk");
+                    }
+
+                    if (bodyBytesRead > 0) {
+                        httpRequest.setBody(bodyStream.toByteArray());
+                    }
+
+                    currentState = State.COMPLETE;
+                    accumulationBuffer.reset();
+                    return ParsingResult.complete(httpRequest);
+
                 default:
                     break;
             }
