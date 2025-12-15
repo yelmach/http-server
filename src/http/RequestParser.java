@@ -257,11 +257,12 @@ public class RequestParser {
                     return ParsingResult.complete(httpRequest);
 
                 default:
-                    break;
+                    return error("Invalid parser state: " + currentState);
             }
         }
 
-        return ParsingResult.complete(httpRequest);
+        accumulationBuffer.reset();
+        return ParsingResult.needMoreData();
     }
 
     private boolean parseRequestLine(String line) {
@@ -318,32 +319,51 @@ public class RequestParser {
     private boolean parseHeaders(byte[] data, int start, int end) {
         int position = start;
 
-        // TODO: Handle multi-line headers starting with space/tab
+        String currentHeaderName = null;
+        StringBuilder currentHeaderValue = new StringBuilder();
+
         while (position < end) {
             int lineEnd = findLineEnd(data, position);
             if (lineEnd == -1) {
                 break;
             }
 
-            String headerLine = new String(data, position, lineEnd - position, StandardCharsets.UTF_8);
+            String line = new String(data, position, lineEnd - position, StandardCharsets.UTF_8);
 
-            int colonIndex = headerLine.indexOf(':');
-            if (colonIndex == -1) {
-                errorMessage = "Invalid header format (missing colon): " + headerLine;
-                return false;
+            if (line.length() > 0 && (line.charAt(0) == ' ' || line.charAt(0) == '\t')) {
+                if (currentHeaderName == null) {
+                    errorMessage = "Header continuation line without preceding header";
+                    return false;
+                }
+
+                currentHeaderValue.append(' ').append(line.trim());
+            } else {
+                if (currentHeaderName != null) {
+                    httpRequest.getHeaders().add(currentHeaderName, currentHeaderValue.toString());
+                }
+
+                int colonIndex = line.indexOf(':');
+                if (colonIndex == -1) {
+                    errorMessage = "Invalid header format (missing colon): " + line;
+                    return false;
+                }
+
+                currentHeaderName = line.substring(0, colonIndex).trim();
+                String value = line.substring(colonIndex + 1).trim();
+
+                if (currentHeaderName.isEmpty()) {
+                    errorMessage = "Empty header name";
+                    return false;
+                }
+
+                currentHeaderValue = new StringBuilder(value);
             }
 
-            String name = headerLine.substring(0, colonIndex).trim();
-            String value = headerLine.substring(colonIndex + 1).trim();
+            position = lineEnd + 2;
+        }
 
-            if (name.isEmpty()) {
-                errorMessage = "Empty header name";
-                return false;
-            }
-
-            httpRequest.getHeaders().add(name, value);
-
-            position = lineEnd + 2; // Skip \r\n
+        if (currentHeaderName != null) {
+            httpRequest.getHeaders().add(currentHeaderName, currentHeaderValue.toString());
         }
 
         return true;

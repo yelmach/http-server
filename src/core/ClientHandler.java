@@ -61,7 +61,7 @@ public class ClientHandler {
         // Temporary: Return simple 200 OK response
         String responseText = "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: text/plain\r\n" +
-                "Content-Length: 13\r\n" +
+                "Content-Length: 17\r\n" +
                 "\r\n" +
                 "Request parsed successfuly";
         responseBuffer = ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8));
