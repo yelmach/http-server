@@ -50,7 +50,7 @@ public class ClientHandler {
 
                 close();
             } else if (result.isNeedMoreData()) {
-                System.out.println("Need more data, read " + bytesRead + " bytes so far");
+                System.out.println("-> Need more data");
             }
         }
     }
@@ -63,7 +63,7 @@ public class ClientHandler {
                 "Content-Type: text/plain\r\n" +
                 "Content-Length: 13\r\n" +
                 "\r\n" +
-                "Hello, World!";
+                "Request parsed successfuly";
         responseBuffer = ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8));
     }
 

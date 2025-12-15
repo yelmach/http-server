@@ -23,7 +23,7 @@ public class Server {
 
         serverSocket.register(selector, SelectionKey.OP_ACCEPT);
 
-        System.out.println("Server started on port " + port);
+        System.out.println("-> Server started on port " + port);
 
         while (true) {
             selector.select();

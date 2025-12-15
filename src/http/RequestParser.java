@@ -105,7 +105,7 @@ public class RequestParser {
                             return error("Headers exceed maximum size of " + MAX_HEADER_SIZE);
                         }
 
-                        keepUnprocessedData(data, position);
+                        removeProcessedData(data, position);
                         return ParsingResult.needMoreData();
                     }
 
@@ -142,7 +142,29 @@ public class RequestParser {
                     break;
 
                 case PARSING_BODY_FIXED_LENGTH:
-                    break;
+                    int remaining = expectedBodyLength - bodyBytesRead;
+                    int availableBytes = data.length - position;
+                    int bytesToRead = Math.min(remaining, availableBytes);
+
+                    if (bytesToRead > 0) {
+                        if (httpRequest.getBody() == null) {
+                            httpRequest.setBody(new byte[expectedBodyLength]);
+                        }
+
+                        System.arraycopy(data, position, httpRequest.getBody(), bodyBytesRead, bytesToRead);
+                        bodyBytesRead += bytesToRead;
+                        position += bytesToRead;
+                    }
+
+                    if (bodyBytesRead >= expectedBodyLength) {
+                        currentState = State.COMPLETE;
+                        accumulationBuffer.reset();
+                        return ParsingResult.complete(httpRequest);
+                    } else {
+                        removeProcessedData(data, position);
+                        return ParsingResult.needMoreData();
+                    }
+
                 case PARSING_CHUNK_SIZE:
                     break;
                 case PARSING_CHUNK_DATA:
@@ -262,7 +284,7 @@ public class RequestParser {
         return -1;
     }
 
-    private void keepUnprocessedData(byte[] data, int startPos) {
+    private void removeProcessedData(byte[] data, int startPos) {
         accumulationBuffer.reset();
 
         if (startPos < data.length) {
