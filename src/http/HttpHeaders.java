@@ -59,8 +59,34 @@ public class HttpHeaders {
             return "Missing required Host header";
         }
 
-        if (has("content-length") && getContentLength() < 0) {
-            return "Invalid Content value";
+        List<String> clValues = getAll("content-length");
+        if (clValues != null && clValues.size() > 1) {
+            String first = clValues.get(0).trim();
+            for (String val : clValues) {
+                if (!val.trim().equals(first)) {
+                    return "Conflicting Content-Length headers detected";
+                }
+            }
+        }
+
+        if (isChunked() && has("content-length")) {
+            headers.remove("content-length");
+        } else if (has("content-length") && getContentLength() < 0) {
+            return "Invalid content-length value";
+        }
+
+        if (has("transfer-encoding")) {
+            String encoding = get("transfer-encoding");
+            if (!"chunked".equals(encoding.trim())) {
+                return "Not Implemented: Unsupported Transfer-Encoding: " + encoding;
+            }
+
+            if (has("content-length")) {
+                headers.remove("content-length");
+            }
+        } else if (has("content-length") && getContentLength() < 0) {
+            return "Invalid Content-Length value";
+
         }
 
         return null;
