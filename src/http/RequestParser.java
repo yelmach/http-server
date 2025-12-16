@@ -23,6 +23,7 @@ public class RequestParser {
     private static final int MAX_REQUEST_LINE_LENGTH = 8 * 1024;
     private static final int MAX_HEADER_SIZE = 16 * 1024;
     private static final int MAX_URI_LENGTH = 4 * 1024;
+    private static final int MAX_EMPTY_LINES = 10;
     private final int maxBodySize;
 
     private State currentState;
@@ -36,6 +37,7 @@ public class RequestParser {
     private int currentChunkSize;
     private int currentChunkBytesRead;
 
+    private int emptyLinesSkipped;
     private String errorMessage;
 
     public RequestParser(int maxBodySize) {
@@ -57,6 +59,7 @@ public class RequestParser {
         expectedBodyLength = 0;
         currentChunkSize = 0;
         currentChunkBytesRead = 0;
+        emptyLinesSkipped = 0;
         errorMessage = null;
     }
 
@@ -79,6 +82,15 @@ public class RequestParser {
         while (position < data.length) {
             switch (currentState) {
                 case PARSING_REQUEST_LINE:
+                    // empty line skipped
+                    while (position + 1 < data.length && data[position] == '\r' && data[position + 1] == '\n') {
+                        emptyLinesSkipped++;
+                        if (emptyLinesSkipped > MAX_EMPTY_LINES) {
+                            return error("Too many empty lines before request line (max " + MAX_EMPTY_LINES + ")");
+                        }
+                        position += 2;
+                    }
+
                     int endLinePos = findLineEnd(data, position);
                     if (endLinePos == -1) {
                         if (data.length >= MAX_REQUEST_LINE_LENGTH) {
