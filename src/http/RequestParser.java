@@ -1,6 +1,7 @@
 package http;
 
 import java.io.ByteArrayOutputStream;
+import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -296,14 +297,33 @@ public class RequestParser {
             return false;
         }
 
+        String rawPath;
+        String rawQuery;
         int queryIndex = uri.indexOf('?');
+
         if (queryIndex == -1) {
-            httpRequest.setPath(uri);
-            httpRequest.setQueryString(null);
+            rawPath = uri;
+            rawQuery = null;
         } else {
-            httpRequest.setPath(uri.substring(0, queryIndex));
-            httpRequest.setQueryString(uri.substring(queryIndex + 1));
+            rawPath = uri.substring(0, queryIndex);
+            rawQuery = uri.substring(queryIndex + 1);
         }
+
+        String decodedPath;
+        try {
+            decodedPath = URLDecoder.decode(rawPath, StandardCharsets.UTF_8.name());
+        } catch (Exception e) {
+            errorMessage = "Malformed URL encoding in path";
+            return false;
+        }
+
+        if (decodedPath.contains("..")) {
+            errorMessage = "Path traversal detected";
+            return false;
+        }
+
+        httpRequest.setPath(decodedPath);
+        httpRequest.setQueryString(rawQuery);
 
         String version = parts[2];
         if (!version.equals("HTTP/1.1") && !version.equals("HTTP/1.0")) {
