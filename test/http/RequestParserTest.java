@@ -74,6 +74,18 @@ public class RequestParserTest {
         testCompleteRequestInMultipleParts();
         testParserReset();
 
+        // Robustness Tests (Empty Line Handling)
+        testSingleEmptyLineBeforeRequest();
+        testMultipleEmptyLinesBeforeRequest();
+        testTooManyEmptyLinesBeforeRequest();
+        testEmptyLinesWithKeepAlive();
+
+        // Keep-Alive Tests
+        testKeepAliveHTTP11Default();
+        testKeepAliveHTTP11WithClose();
+        testKeepAliveHTTP10Default();
+        testKeepAliveHTTP10WithKeepAlive();
+
         // Print Summary
         System.out.println("\n=================================================");
         System.out.println("                 Test Summary");
@@ -743,6 +755,126 @@ public class RequestParserTest {
         assertTrue("Second request should be complete", result2.isComplete());
         assertEquals("Method should be POST", HttpMethod.POST, result2.getRequest().getMethod());
         assertEquals("Path should be /second", "/second", result2.getRequest().getPath());
+    }
+
+    // ========================================
+    // Robustness Tests (Empty Line Handling)
+    // ========================================
+
+    private static void testSingleEmptyLineBeforeRequest() {
+        RequestParser parser = new RequestParser();
+        // RFC 7230: servers SHOULD ignore at least one empty line before request-line
+        String request = "\r\nGET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Request with one empty line should be complete", result.isComplete());
+        assertNotNull("Request should not be null", result.getRequest());
+        assertEquals("Method should be GET", HttpMethod.GET, result.getRequest().getMethod());
+        assertEquals("Path should be /", "/", result.getRequest().getPath());
+    }
+
+    private static void testMultipleEmptyLinesBeforeRequest() {
+        RequestParser parser = new RequestParser();
+        // Multiple empty lines before request
+        String request = "\r\n\r\n\r\nGET /test HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Request with multiple empty lines should be complete", result.isComplete());
+        assertEquals("Path should be /test", "/test", result.getRequest().getPath());
+    }
+
+    private static void testTooManyEmptyLinesBeforeRequest() {
+        RequestParser parser = new RequestParser();
+        // More than MAX_EMPTY_LINES (10) empty lines
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 15; i++) {
+            sb.append("\r\n");
+        }
+        sb.append("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        String request = sb.toString();
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Too many empty lines should result in error", result.isError());
+        assertContains("Error should mention too many empty lines",
+                      result.getErrorMessage(), "Too many empty lines");
+    }
+
+    private static void testEmptyLinesWithKeepAlive() {
+        RequestParser parser = new RequestParser();
+        // First request
+        String request1 = "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        ByteBuffer buffer1 = ByteBuffer.wrap(request1.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result1 = parser.parse(buffer1);
+        assertTrue("First request should be complete", result1.isComplete());
+
+        // Reset parser (simulating keep-alive)
+        parser.reset();
+
+        // Second request with empty lines (noise from keep-alive connection)
+        String request2 = "\r\n\r\nGET /second HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        ByteBuffer buffer2 = ByteBuffer.wrap(request2.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result2 = parser.parse(buffer2);
+        assertTrue("Second request with empty lines should be complete", result2.isComplete());
+        assertEquals("Path should be /second", "/second", result2.getRequest().getPath());
+    }
+
+    // ========================================
+    // Keep-Alive Tests
+    // ========================================
+
+    private static void testKeepAliveHTTP11Default() {
+        RequestParser parser = new RequestParser();
+        String request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Request should be complete", result.isComplete());
+        assertTrue("HTTP/1.1 should keep-alive by default", result.getRequest().shouldKeepAlive());
+    }
+
+    private static void testKeepAliveHTTP11WithClose() {
+        RequestParser parser = new RequestParser();
+        String request = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Request should be complete", result.isComplete());
+        assertFalse("HTTP/1.1 with Connection: close should not keep-alive",
+                   result.getRequest().shouldKeepAlive());
+    }
+
+    private static void testKeepAliveHTTP10Default() {
+        RequestParser parser = new RequestParser();
+        String request = "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n";
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Request should be complete", result.isComplete());
+        assertFalse("HTTP/1.0 should not keep-alive by default",
+                   result.getRequest().shouldKeepAlive());
+    }
+
+    private static void testKeepAliveHTTP10WithKeepAlive() {
+        RequestParser parser = new RequestParser();
+        String request = "GET / HTTP/1.0\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n";
+        ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+
+        ParsingResult result = parser.parse(buffer);
+
+        assertTrue("Request should be complete", result.isComplete());
+        assertTrue("HTTP/1.0 with Connection: keep-alive should keep-alive",
+                  result.getRequest().shouldKeepAlive());
     }
 
     // ========================================
