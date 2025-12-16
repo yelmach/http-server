@@ -12,4 +12,13 @@ public enum HttpMethod {
             throw new InvalidMethodException("Invalid HTTP method: " + method);
         }
     }
+
+    // Helper for tests - doesn't throw checked exception
+    public static HttpMethod fromStringUnsafe(String method) {
+        try {
+            return fromString(method);
+        } catch (InvalidMethodException e) {
+            return null;
+        }
+    }
 }
