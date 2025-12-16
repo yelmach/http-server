@@ -18,15 +18,21 @@ public class ClientHandler {
     private final RequestParser parser;
     private HttpRequest currentRequest;
     private ByteBuffer responseBuffer;
+    private boolean keepAlive;
+    private long lastActivityTime;
+    private final long timeoutMs = 10000;
 
     public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey) {
         this.client = clientChannel;
         this.selectionKey = selectionKey;
         this.readBuffer = ByteBuffer.allocate(8192);
         this.parser = new RequestParser();
+        this.lastActivityTime = System.currentTimeMillis();
     }
 
     public void read() throws IOException {
+        lastActivityTime = System.currentTimeMillis();
+
         readBuffer.clear();
         int bytesRead = client.read(readBuffer);
 
@@ -58,25 +64,48 @@ public class ClientHandler {
     private void handleRequest() {
         System.out.println("Received: " + currentRequest.getMethod() + " " + currentRequest.getPath());
 
-        // Temporary: Return simple 200 OK response
+        keepAlive = currentRequest.shouldKeepAlive();
+
+        String body = "Request parsed successfuly";
+        String connectionHeader = keepAlive ? "keep-alive" : "close";
+
         String responseText = "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: text/plain\r\n" +
-                "Content-Length: 17\r\n" +
+                "Content-Length: " + body.length() + "\r\n" +
+                "Connection: " + connectionHeader + "\r\n" +
                 "\r\n" +
-                "Request parsed successfuly";
+                body;
         responseBuffer = ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8));
     }
 
     public void write() throws IOException {
         if (responseBuffer != null && responseBuffer.hasRemaining()) {
+            lastActivityTime = System.currentTimeMillis();
             client.write(responseBuffer);
 
             if (!responseBuffer.hasRemaining()) {
-                // Response sent, close connection
-                // Later: check Connection: keep-alive
-                close();
+                if (keepAlive) {
+                    resetForNextRequest();
+                } else {
+                    close();
+                }
             }
         }
+    }
+
+    private void resetForNextRequest() {
+        parser.reset();
+        currentRequest = null;
+        responseBuffer = null;
+        keepAlive = false;
+        lastActivityTime = System.currentTimeMillis();
+        selectionKey.interestOps(SelectionKey.OP_READ);
+        System.out.println("Connection kept alive, ready for next request");
+    }
+
+    public boolean isTimedOut() {
+        long currentTime = System.currentTimeMillis();
+        return (currentTime - lastActivityTime) > timeoutMs;
     }
 
     private void close() throws IOException {

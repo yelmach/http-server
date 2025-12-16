@@ -69,4 +69,14 @@ public class HttpRequest {
     public void setQueryString(String queryString) {
         this.queryString = queryString;
     }
+
+    public boolean shouldKeepAlive() {
+        String connection = headers.get("Connection");
+
+        if ("HTTP/1.1".equals(httpVersion)) {
+            return connection == null || !connection.equals("close");
+        } else {
+            return connection != null && connection.equals("keep-alive");
+        }
+    }
 }

@@ -26,7 +26,9 @@ public class Server {
         System.out.println("-> Server started on port " + port);
 
         while (true) {
-            selector.select();
+            selector.select(1000);
+
+            checkTimeouts();
 
             // Get list of events
             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
@@ -80,5 +82,23 @@ public class Server {
     private void handleWrite(SelectionKey key) throws IOException {
         ClientHandler handler = (ClientHandler) key.attachment();
         handler.write();
+    }
+
+    private void checkTimeouts() {
+        for (SelectionKey key : selector.keys()) {
+            if (key.isValid() && key.attachment() instanceof ClientHandler) {
+                ClientHandler handler = (ClientHandler) key.attachment();
+
+                if (handler.isTimedOut()) {
+                    System.out.println("Connection timed out, closing...");
+                    try {
+                        key.cancel();
+                        key.channel().close();
+                    } catch (IOException e) {
+                        System.err.println("Error closing timed-out connection: " + e.getMessage());
+                    }
+                }
+            }
+        }
     }
 }
