@@ -308,10 +308,9 @@ public class RequestParser {
             return false;
         }
 
-        // Check for path traversal
-        if (uri.contains("..")) {
-            errorMessage = "Path traversal detected in URI";
-            return false;
+        int fragmentIndex = uri.indexOf('#');
+        if (fragmentIndex != -1) {
+            uri = uri.substring(0, fragmentIndex);
         }
 
         String rawPath;
