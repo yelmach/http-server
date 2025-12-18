@@ -51,16 +51,21 @@ public class RequestParser {
         this(10 * 1024 * 1024);
     }
 
-    public void reset() {
+    public void resetState() {
         currentState = State.PARSING_REQUEST_LINE;
         httpRequest = new HttpRequest();
-        accumulationBuffer.reset();
         bodyBytesRead = 0;
         expectedBodyLength = 0;
         currentChunkSize = 0;
         currentChunkBytesRead = 0;
         emptyLinesSkipped = 0;
         errorMessage = null;
+        bodyStream = null;
+    }
+
+    public void reset() {
+        resetState();
+        accumulationBuffer.reset();
     }
 
     public ParsingResult parse(ByteBuffer buffer) {
@@ -148,7 +153,7 @@ public class RequestParser {
                             currentState = State.PARSING_BODY_FIXED_LENGTH;
                         } else {
                             currentState = State.COMPLETE;
-                            accumulationBuffer.reset();
+                            removeProcessedData(data, position);
                             return ParsingResult.complete(httpRequest);
                         }
                     }
@@ -171,7 +176,7 @@ public class RequestParser {
 
                     if (bodyBytesRead >= expectedBodyLength) {
                         currentState = State.COMPLETE;
-                        accumulationBuffer.reset();
+                        removeProcessedData(data, position);
                         return ParsingResult.complete(httpRequest);
                     } else {
                         removeProcessedData(data, position);
@@ -266,7 +271,7 @@ public class RequestParser {
                     }
 
                     currentState = State.COMPLETE;
-                    accumulationBuffer.reset();
+                    removeProcessedData(data, position);
                     return ParsingResult.complete(httpRequest);
 
                 default:
@@ -274,7 +279,7 @@ public class RequestParser {
             }
         }
 
-        accumulationBuffer.reset();
+        removeProcessedData(data, position);
         return ParsingResult.needMoreData();
     }
 

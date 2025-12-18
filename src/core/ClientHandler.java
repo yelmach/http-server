@@ -9,6 +9,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class ClientHandler {
 
@@ -16,8 +18,7 @@ public class ClientHandler {
     private final SelectionKey selectionKey;
     private final ByteBuffer readBuffer;
     private final RequestParser parser;
-    private HttpRequest currentRequest;
-    private ByteBuffer responseBuffer;
+    private final Queue<ByteBuffer> responseQueue = new LinkedList<>();
     private boolean keepAlive;
     private long lastActivityTime;
     private final long timeoutMs = 10000;
@@ -32,7 +33,6 @@ public class ClientHandler {
 
     public void read() throws IOException {
         lastActivityTime = System.currentTimeMillis();
-
         readBuffer.clear();
         int bytesRead = client.read(readBuffer);
 
@@ -47,21 +47,26 @@ public class ClientHandler {
 
             ParsingResult result = parser.parse(readBuffer);
 
-            if (result.isComplete()) {
-                currentRequest = result.getRequest();
-                handleRequest();
-                selectionKey.interestOps(SelectionKey.OP_WRITE);
-            } else if (result.isError()) {
-                System.err.println("Parsing error: " + result.getErrorMessage());
+            while (result.isComplete()) {
+                HttpRequest currentRequest = result.getRequest();
+                handleRequest(currentRequest);
 
+                parser.resetState();
+                result = parser.parse(ByteBuffer.allocate(0));
+            }
+
+            if (result.isError()) {
+                System.err.println("Parsing error: " + result.getErrorMessage());
                 close();
-            } else if (result.isNeedMoreData()) {
-                System.out.println("-> Need more data");
+            }
+
+            if (!responseQueue.isEmpty()) {
+                selectionKey.interestOps(SelectionKey.OP_WRITE);
             }
         }
     }
 
-    private void handleRequest() {
+    private void handleRequest(HttpRequest currentRequest) {
         System.out.println("Received: " + currentRequest.getMethod() + " " + currentRequest.getPath());
 
         keepAlive = currentRequest.shouldKeepAlive();
@@ -75,32 +80,30 @@ public class ClientHandler {
                 "Connection: " + connectionHeader + "\r\n" +
                 "\r\n" +
                 body;
-        responseBuffer = ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8));
+
+        responseQueue.add(ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8)));
     }
 
     public void write() throws IOException {
-        if (responseBuffer != null && responseBuffer.hasRemaining()) {
-            lastActivityTime = System.currentTimeMillis();
+        lastActivityTime = System.currentTimeMillis();
+
+        ByteBuffer responseBuffer = responseQueue.peek();
+
+        if (responseBuffer != null) {
             client.write(responseBuffer);
 
             if (!responseBuffer.hasRemaining()) {
-                if (keepAlive) {
-                    resetForNextRequest();
-                } else {
-                    close();
+                responseQueue.poll();
+
+                if (responseQueue.isEmpty()) {
+                    if (keepAlive) {
+                        selectionKey.interestOps(SelectionKey.OP_READ);
+                    } else {
+                        close();
+                    }
                 }
             }
         }
-    }
-
-    private void resetForNextRequest() {
-        parser.reset();
-        currentRequest = null;
-        responseBuffer = null;
-        keepAlive = false;
-        lastActivityTime = System.currentTimeMillis();
-        selectionKey.interestOps(SelectionKey.OP_READ);
-        System.out.println("Connection kept alive, ready for next request");
     }
 
     public boolean isTimedOut() {

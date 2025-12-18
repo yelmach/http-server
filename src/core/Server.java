@@ -64,10 +64,8 @@ public class Server {
 
         client.configureBlocking(false);
 
-        // Register client with selector for reading
         SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ);
 
-        // Attach a state object (ClientHandler) to this specific key
         ClientHandler handler = new ClientHandler(client, clientKey);
         clientKey.attach(handler);
 
