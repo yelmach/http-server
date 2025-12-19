@@ -1,0 +1,10 @@
+This is a plain text file served by JavaNIOServer.
+
+Features:
+- HTTP/1.1 compliant
+- Keep-alive connections
+- HTTP pipelining
+- Static file serving
+- MIME type detection
+
+The Content-Type header should be: text/plain; charset=UTF-8

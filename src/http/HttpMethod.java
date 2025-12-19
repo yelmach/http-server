@@ -3,7 +3,7 @@ package http;
 import exceptions.InvalidMethodException;
 
 public enum HttpMethod {
-    GET, POST, DELETE;
+    GET, POST, DELETE, HEAD;
 
     public static HttpMethod fromString(String method) throws InvalidMethodException {
         try {

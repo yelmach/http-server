@@ -14,7 +14,7 @@ public class Main {
             ServerConfig config = ConfigLoader.load(configFileName);
 
             Server server = new Server();
-            server.start(config.getPort());
+            server.start(config);
 
         } catch (IOException e) {
             System.err.println("Server failed to start: " + e.getMessage());

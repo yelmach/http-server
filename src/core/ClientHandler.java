@@ -1,6 +1,9 @@
 package core;
 
+import config.ServerConfig;
+import handlers.StaticHandler;
 import http.HttpRequest;
+import http.HttpResponse;
 import http.ParsingResult;
 import http.RequestParser;
 
@@ -8,7 +11,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -19,15 +21,17 @@ public class ClientHandler {
     private final ByteBuffer readBuffer;
     private final RequestParser parser;
     private final Queue<ByteBuffer> responseQueue = new LinkedList<>();
+    private final StaticHandler staticHandler;
     private boolean keepAlive;
     private long lastActivityTime;
     private final long timeoutMs = 10000;
 
-    public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey) {
+    public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey, ServerConfig config) {
         this.client = clientChannel;
         this.selectionKey = selectionKey;
         this.readBuffer = ByteBuffer.allocate(8192);
         this.parser = new RequestParser();
+        this.staticHandler = new StaticHandler(config);
         this.lastActivityTime = System.currentTimeMillis();
     }
 
@@ -71,17 +75,23 @@ public class ClientHandler {
 
         keepAlive = currentRequest.shouldKeepAlive();
 
-        String body = "Request parsed successfuly";
-        String connectionHeader = keepAlive ? "keep-alive" : "close";
+        // Create response object
+        HttpResponse response = new HttpResponse();
+        response.keepAlive(keepAlive);
 
-        String responseText = "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/plain\r\n" +
-                "Content-Length: " + body.length() + "\r\n" +
-                "Connection: " + connectionHeader + "\r\n" +
-                "\r\n" +
-                body;
+        // Use static handler for all requests
+        try {
+            staticHandler.handle(currentRequest, response);
+        } catch (Exception e) {
+            System.err.println("Error handling request: " + e.getMessage());
+            e.printStackTrace();
+            response = HttpResponse.error500(e.getMessage());
+            response.keepAlive(keepAlive);
+        }
 
-        responseQueue.add(ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8)));
+        // Convert to ByteBuffer and queue
+        ByteBuffer responseBuffer = response.toByteBuffer();
+        responseQueue.add(responseBuffer);
     }
 
     public void write() throws IOException {

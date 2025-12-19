@@ -1,5 +1,7 @@
 package core;
 
+import config.ServerConfig;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
@@ -12,8 +14,11 @@ public class Server {
 
     private Selector selector;
     private ServerSocketChannel serverSocket;
+    private ServerConfig config;
 
-    public void start(int port) throws IOException {
+    public void start(ServerConfig config) throws IOException {
+        this.config = config;
+        int port = config.getPort();
 
         selector = Selector.open();
         serverSocket = ServerSocketChannel.open();
@@ -66,7 +71,7 @@ public class Server {
 
         SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ);
 
-        ClientHandler handler = new ClientHandler(client, clientKey);
+        ClientHandler handler = new ClientHandler(client, clientKey, config);
         clientKey.attach(handler);
 
         System.out.println("New connection: " + client.getRemoteAddress());
