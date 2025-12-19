@@ -91,4 +91,18 @@ public class HttpHeaders {
 
         return null;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String key = entry.getKey();
+
+            for (String value : entry.getValue()) {
+                sb.append(key).append(": ").append(value).append("\r\n");
+            }
+        }
+
+        return sb.toString();
+    }
 }
