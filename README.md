@@ -51,3 +51,29 @@ src/
 │
 └── Main.java                # Entry point
 ```
+
+## 🧠 The Core: HTTP Parser
+
+The parsing engine (`RequestParser.java`) is designed to handle **TCP fragmentation** and **Packet Coalescing** inherently. Since `java.nio` is non-blocking, we cannot assume a single `read()` call contains a complete HTTP request—it might contain half a request, or three requests at once.
+
+To solve this, the parser is implemented as a **Finite State Machine (FSM)**. for more details [parser.md](docs/parser.md)
+
+### 1. Finite State Machine (FSM) Design
+Instead of waiting for a full stream, the parser processes bytes as they arrive, transitioning through strict states. It pauses execution when data runs out and resumes exactly where it left off when new bytes arrive.
+
+**The States:**
+* `PARSING_REQUEST_LINE`: Accumulates bytes until `\r\n`. Parses Method, URI (with percent-decoding), and Version.
+* `PARSING_HEADERS`: Reads key-value pairs until an empty line (`\r\n\r\n`) is found. Enforces strict RFC 7230/9112 rules (no whitespace before colon, unique Host header).
+* `PARSING_BODY_FIXED_LENGTH`: Reads exactly `Content-Length` bytes.
+* `PARSING_CHUNK_SIZE` & `CHUNK_DATA`: Handles `Transfer-Encoding: chunked` for streaming uploads.
+* `COMPLETE`: Signals the `ClientHandler` that a request is ready for processing.
+
+### 2. Handling TCP Anomalies
+* **Fragmentation (Partial Requests):** If a packet ends in the middle of a header, the parser returns `NEED_MORE_DATA`. The bytes are stored in an `accumulationBuffer`, and the parser waits for the next `read()` event to append the missing parts.
+* **Pipelining (Multiple Requests):** If a client sends multiple requests in one batch (e.g., `GET /A` and `GET /B`), the parser processes `/A`, triggers a response, and **shifts** the buffer to preserve the bytes of `/B`. The `ClientHandler` loops until the buffer is drained, ensuring no requests are dropped.
+
+### 3. Security Features
+The parser includes "Defense in Depth" mechanisms to prevent common attacks:
+* **Request Smuggling:** Strictly rejects requests with conflicting `Content-Length` headers or mixed `Transfer-Encoding`.
+* **Path Traversal:** Decodes URIs and blocks paths containing `..` after decoding.
+* **DoS Protection:** Enforces hard limits on Request Line length (8KB), Header size (16KB), and Body size (Configurable) to prevent memory exhaustion.

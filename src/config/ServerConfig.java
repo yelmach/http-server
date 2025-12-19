@@ -43,5 +43,4 @@ public class ServerConfig {
         return "ServerConfig [host=" + host + ", port=" + port + ", root=" + root + "]";
     }
 
-    
 }

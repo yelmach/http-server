@@ -13,9 +13,6 @@ public class Main {
 
             ServerConfig config = ConfigLoader.load(configFileName);
 
-            System.out.println("configuration loaded");
-            System.out.println(config.toString());
-
             Server server = new Server();
             server.start(config.getPort());
 
