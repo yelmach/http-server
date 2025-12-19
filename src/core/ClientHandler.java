@@ -1,14 +1,15 @@
 package core;
 
 import http.HttpRequest;
+import http.HttpStatusCode;
 import http.ParsingResult;
 import http.RequestParser;
+import http.ResponseBuilder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -71,17 +72,14 @@ public class ClientHandler {
 
         keepAlive = currentRequest.shouldKeepAlive();
 
-        String body = "Request parsed successfuly";
-        String connectionHeader = keepAlive ? "keep-alive" : "close";
+        ByteBuffer response = new ResponseBuilder()
+                .status(HttpStatusCode.OK)
+                .keepAlive(keepAlive)
+                .contentType("text/plain")
+                .body("request parsed successfully")
+                .buildResponse();
 
-        String responseText = "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/plain\r\n" +
-                "Content-Length: " + body.length() + "\r\n" +
-                "Connection: " + connectionHeader + "\r\n" +
-                "\r\n" +
-                body;
-
-        responseQueue.add(ByteBuffer.wrap(responseText.getBytes(StandardCharsets.UTF_8)));
+        responseQueue.add(response);
     }
 
     public void write() throws IOException {
