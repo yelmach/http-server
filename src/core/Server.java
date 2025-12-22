@@ -7,11 +7,15 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.logging.Logger;
+
+import utils.ServerLogger;
 
 public class Server {
 
     private Selector selector;
     private ServerSocketChannel serverSocket;
+    private final Logger logger = ServerLogger.get();
 
     public void start(int port) throws IOException {
 
@@ -23,7 +27,7 @@ public class Server {
 
         serverSocket.register(selector, SelectionKey.OP_ACCEPT);
 
-        System.out.println("-> Server started on port " + port);
+        logger.info("Server started on port :" + port);
 
         while (true) {
             selector.select(1000);
@@ -50,7 +54,7 @@ public class Server {
                         handleWrite(key);
                     }
                 } catch (IOException e) {
-                    System.err.println("error: " + e.getMessage());
+                    logger.severe(e.getMessage());
                     key.cancel();
                     key.channel().close();
                 }
@@ -69,7 +73,7 @@ public class Server {
         ClientHandler handler = new ClientHandler(client, clientKey);
         clientKey.attach(handler);
 
-        System.out.println("New connection: " + client.getRemoteAddress());
+        logger.info("New connection: " + client.getRemoteAddress());
     }
 
     private void handleRead(SelectionKey key) throws IOException {
@@ -88,12 +92,12 @@ public class Server {
                 ClientHandler handler = (ClientHandler) key.attachment();
 
                 if (handler.isTimedOut()) {
-                    System.out.println("Connection timed out, closing...");
+                    logger.info("Connection timed out, closing...");
                     try {
                         key.cancel();
                         key.channel().close();
                     } catch (IOException e) {
-                        System.err.println("Error closing timed-out connection: " + e.getMessage());
+                        logger.severe("Error closing timed-out connection: " + e.getMessage());
                     }
                 }
             }
