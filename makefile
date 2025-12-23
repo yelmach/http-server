@@ -4,6 +4,7 @@ JAVA = java
 SRC_DIR = src
 TEST_DIR = test
 BUILD_DIR = build
+LOG_DIR = logs
 MAIN_CLASS = Main
 TEST_CLASS = http.RequestParserTest
 PORT = 8080
@@ -39,8 +40,8 @@ test: build-test
 
 # Run the server
 .PHONY: run
-run: build
-	@echo "Starting HTTP server on port $(PORT)..."
+run: clean-logs build
+	@echo "Starting HTTP server on port :$(PORT)..."
 	$(JAVA) -cp $(BUILD_DIR) $(MAIN_CLASS)
 
 # Clean build artifacts
@@ -50,9 +51,15 @@ clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Clean complete!"
 
+# Clean logs
+.PHONY: clean-logs
+clean-logs:
+	@echo "Cleaning logs directory..."
+	rm -rf $(LOG_DIR)/*
+
 # Rebuild (clean + build)
 .PHONY: rebuild
-rebuild: clean build
+rebuild: clean clean-logs build
 
 # Help target
 .PHONY: help
@@ -64,4 +71,5 @@ help:
 	@echo "  make clean      - Remove compiled files"
 	@echo "  make rebuild    - Clean and rebuild the project"
 	@echo "  make build-test - Compile test sources"
+	@echo "  make clean-logs - Remove log files"
 	@echo "  make help       - Show this help message"

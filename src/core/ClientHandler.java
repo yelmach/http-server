@@ -5,13 +5,16 @@ import http.HttpStatusCode;
 import http.ParsingResult;
 import http.RequestParser;
 import http.ResponseBuilder;
+import utils.ServerLogger;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.logging.Logger;
 
 public class ClientHandler {
 
@@ -23,6 +26,7 @@ public class ClientHandler {
     private boolean keepAlive;
     private long lastActivityTime;
     private final long timeoutMs = 10000;
+    private final Logger logger = ServerLogger.get();
 
     public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey) {
         this.client = clientChannel;
@@ -39,7 +43,7 @@ public class ClientHandler {
 
         if (bytesRead == -1) {
             close();
-            System.out.println("Client disconnected.");
+            logger.info("Client disconnected.");
             return;
         }
 
@@ -57,7 +61,7 @@ public class ClientHandler {
             }
 
             if (result.isError()) {
-                System.err.println("Parsing error: " + result.getErrorMessage());
+                logger.severe("Parsing error: " + result.getErrorMessage());
                 close();
             }
 
@@ -68,7 +72,7 @@ public class ClientHandler {
     }
 
     private void handleRequest(HttpRequest currentRequest) {
-        System.out.println("Received: " + currentRequest.getMethod() + " " + currentRequest.getPath());
+        logger.info("Received: " + currentRequest.getMethod() + " " + currentRequest.getPath());
 
         keepAlive = currentRequest.shouldKeepAlive();
 
@@ -101,6 +105,16 @@ public class ClientHandler {
                     }
                 }
             }
+        }
+    }
+
+    public SocketAddress getIpAddress() {
+        try {
+            return this.client.getRemoteAddress();
+
+        } catch (IOException e) {
+            logger.severe("Error getting IP address: " + e.getMessage());
+            return null;
         }
     }
 
