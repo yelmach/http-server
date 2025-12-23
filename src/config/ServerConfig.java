@@ -1,13 +1,14 @@
 package config;
 
 import java.util.List;
+import java.util.Map;
 
 public class ServerConfig {
+
     private String serverName;
     private String host;
-    private String root;
     private List<Integer> ports;
-    private List<String> methods;
+    private Map<String, String> errorPages;
     private List<RouteConfig> routes;
 
     // Getters and setters
@@ -23,16 +24,16 @@ public class ServerConfig {
         return ports;
     }
 
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+
     public void setPorts(List<Integer> ports) {
         this.ports = ports;
-    }
-
-    public List<String> getMethods() {
-        return methods;
-    }
-
-    public void setMethods(List<String> methods) {
-        this.methods = methods;
     }
 
     public List<RouteConfig> getRoutes() {
@@ -43,9 +44,25 @@ public class ServerConfig {
         this.routes = routes;
     }
 
+    public Map<String, String> getErrorPages() {
+        return errorPages;
+    }
+
+    public void setErrorPages(Map<String, String> errorPages) {
+        this.errorPages = errorPages;
+    }
+
     @Override
     public String toString() {
-        return "ServerConfig [host=" + host + ", root=" + root + "]";
+        StringBuilder sb = new StringBuilder();
+        sb.append("ServerConfig {\n")
+                .append("  serverName='").append(serverName).append("',\n")
+                .append("  host='").append(host).append("',\n")
+                .append("  ports=").append(ports).append(",\n")
+                .append("  errorPages=").append(errorPages).append(",\n")
+                .append("  routes=").append(routes == null ? "[]" : routes).append("\n")
+                .append("}");
+        return sb.toString();
     }
 
 }
