@@ -16,8 +16,16 @@
       "routes": [
         {
           "path": "/",
-          "method": "GET",
-          "index": "index.html"
+          "methods": ["GET", "POST"],
+          "index": "index.html",
+          "root": "./www",
+          "redirectTo": "/new-page"
+        },
+        {
+          "path": "/blog",
+          "methods": ["POST", "DELETE"],
+          "index": "index.html",
+          "root": "./www"
         }
       ]
     }

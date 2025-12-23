@@ -2,7 +2,6 @@ package config;
 
 import java.util.Map;
 import java.util.logging.Logger;
-
 import utils.ServerLogger;
 
 public class ConfigValidator {
@@ -53,8 +52,12 @@ public class ConfigValidator {
                         logger.severe("Invalid or missing 'path' field in route.");
                         return false;
                     }
-                    if (route.get("method") == null || !(route.get("method") instanceof String)) {
-                        logger.severe("Invalid or missing 'method' field in route.");
+                    if (route.get("root") == null || !(route.get("root") instanceof String)) {
+                        logger.severe("Invalid or missing 'root' field in route.");
+                        return false;
+                    }
+                    if (route.get("methods") == null || !(route.get("methods") instanceof java.util.List)) {
+                        logger.severe("Invalid or missing 'methods' field in route.");
                         return false;
                     }
                 }
