@@ -1,0 +1,25 @@
+{
+  "name": "http-server",
+  "version": "1.0.0",
+  "author": "",
+  "maxBodySize": 10485760,
+  "timeout": 30000,
+  "servers": [
+    {
+      "serverName": "default",
+      "host": "172.0.0.1",
+      "ports": ["8080"],
+      "errorPages": {
+        "404": "/errors/404.html",
+        "500": "/errors/500.html"
+      },
+      "routes": [
+        {
+          "path": "/",
+          "method": "GET",
+          "index": "index.html"
+        }
+      ]
+    }
+  ]
+}
