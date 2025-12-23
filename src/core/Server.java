@@ -92,7 +92,7 @@ public class Server {
                 ClientHandler handler = (ClientHandler) key.attachment();
 
                 if (handler.isTimedOut()) {
-                    logger.info("Connection timed out, closing...");
+                    logger.info("Connection timed out, closing...: " + handler.getIpAddress());
                     try {
                         key.cancel();
                         key.channel().close();
