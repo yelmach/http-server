@@ -8,7 +8,7 @@
     {
       "serverName": "default",
       "host": "172.0.0.1",
-      "ports": ["8080"],
+      "ports": [8080],
       "errorPages": {
         "404": "/errors/404.html",
         "500": "/errors/500.html"

@@ -1,46 +1,51 @@
 package config;
 
+import java.util.List;
+
 public class ServerConfig {
+    private String serverName;
     private String host;
-    private int port;
     private String root;
+    private List<Integer> ports;
+    private List<String> methods;
+    private List<RouteConfig> routes;
 
-    public ServerConfig(String host, int port, String root) {
-        this.host = host;
-        this.port = port;
-        this.root = root;
+    // Getters and setters
+    public String getServerName() {
+        return serverName;
     }
 
-    public ServerConfig() {
+    public void setServerName(String serverName) {
+        this.serverName = serverName;
     }
 
-    public String getHost() {
-        return host;
+    public List<Integer> getPorts() {
+        return ports;
     }
 
-    public void setHost(String host) {
-        this.host = host;
+    public void setPorts(List<Integer> ports) {
+        this.ports = ports;
     }
 
-    public int getPort() {
-        return port;
+    public List<String> getMethods() {
+        return methods;
     }
 
-    public void setPort(int port) {
-        this.port = port;
+    public void setMethods(List<String> methods) {
+        this.methods = methods;
     }
 
-    public String getRoot() {
-        return root;
+    public List<RouteConfig> getRoutes() {
+        return routes;
     }
 
-    public void setRoot(String root) {
-        this.root = root;
+    public void setRoutes(List<RouteConfig> routes) {
+        this.routes = routes;
     }
 
     @Override
     public String toString() {
-        return "ServerConfig [host=" + host + ", port=" + port + ", root=" + root + "]";
+        return "ServerConfig [host=" + host + ", root=" + root + "]";
     }
 
 }
