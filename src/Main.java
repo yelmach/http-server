@@ -1,11 +1,11 @@
-import core.Server;
-import utils.ServerLogger;
-
-import java.io.IOException;
-import java.util.logging.Logger;
 
 import config.AppConfig;
+import config.ConfigLoader;
 import config.ServerConfig;
+import core.Server;
+import java.io.IOException;
+import java.util.logging.Logger;
+import utils.ServerLogger;
 
 public class Main {
 
@@ -15,7 +15,9 @@ public class Main {
     public static void main(String[] args) {
         try {
 
-            AppConfig config = AppConfig.load(configFileName, logger);
+            AppConfig config = ConfigLoader.load(configFileName, logger);
+
+            System.out.println(config.toString());
 
             if (config == null || config.getServers() == null) {
                 logger.severe("Configuration loading failed!");
