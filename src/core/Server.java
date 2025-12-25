@@ -6,9 +6,14 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
+import config.ServerConfig;
 import utils.ServerLogger;
 
 public class Server {
@@ -17,17 +22,26 @@ public class Server {
     private ServerSocketChannel serverSocket;
     private final Logger logger = ServerLogger.get();
 
-    public void start(int port) throws IOException {
+    public void start(List<ServerConfig> configs) throws IOException {
 
         selector = Selector.open();
-        serverSocket = ServerSocketChannel.open();
 
-        serverSocket.bind(new InetSocketAddress(port));
-        serverSocket.configureBlocking(false);
+        Map<Integer, List<ServerConfig>> portMapping = new HashMap<>();
+        for (ServerConfig config : configs) {
+            portMapping.computeIfAbsent(config.getPorts().get(0), k -> new ArrayList<>()).add(config);
+        }
 
-        serverSocket.register(selector, SelectionKey.OP_ACCEPT);
+        for (Map.Entry<Integer, List<ServerConfig>> entry : portMapping.entrySet()) {
+            int port = entry.getKey();
+            List<ServerConfig> virtualHosts = entry.getValue();
 
-        logger.info("Server started on port :" + port);
+            serverSocket = ServerSocketChannel.open();
+            serverSocket.bind(new InetSocketAddress(port));
+            serverSocket.configureBlocking(false);
+            serverSocket.register(selector, SelectionKey.OP_ACCEPT, virtualHosts);
+
+            logger.info("Server started on port: " + port + " with " + virtualHosts.size() + " virtual hosts.");
+        }
 
         while (true) {
             selector.select(1000);
@@ -63,14 +77,15 @@ public class Server {
     }
 
     private void handleAccept(SelectionKey key) throws IOException {
+        List<ServerConfig> virtualHosts = (List<ServerConfig>) key.attachment();
+
         ServerSocketChannel server = (ServerSocketChannel) key.channel();
         SocketChannel client = server.accept();
-
         client.configureBlocking(false);
 
         SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ);
 
-        ClientHandler handler = new ClientHandler(client, clientKey);
+        ClientHandler handler = new ClientHandler(client, clientKey, virtualHosts);
         clientKey.attach(handler);
 
         logger.info("New connection: " + client.getRemoteAddress());

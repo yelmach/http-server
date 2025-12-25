@@ -10,6 +10,7 @@ public class ServerConfig {
     private List<Integer> ports;
     private Map<String, String> errorPages;
     private List<RouteConfig> routes;
+    private Boolean isDefault;
 
     // Getters and setters
     public String getServerName() {
@@ -50,6 +51,14 @@ public class ServerConfig {
 
     public void setErrorPages(Map<String, String> errorPages) {
         this.errorPages = errorPages;
+    }
+
+    public Boolean isDefault() {
+        return isDefault;
+    }
+
+    public void setIsDefault(Boolean isDefault) {
+        this.isDefault = isDefault;
     }
 
     @Override

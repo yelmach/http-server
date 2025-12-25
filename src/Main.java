@@ -1,7 +1,6 @@
 
 import config.AppConfig;
 import config.ConfigLoader;
-import config.ServerConfig;
 import core.Server;
 import java.io.IOException;
 import java.util.logging.Logger;
@@ -24,12 +23,8 @@ public class Main {
                 return;
             }
 
-            for (ServerConfig serverConfig : config.getServers()) {
-                Server server = new Server();
-                for (int port : serverConfig.getPorts()) {
-                    server.start(port);
-                }
-            }
+            Server server = new Server();
+            server.start(config.getServers());
 
         } catch (IOException e) {
             logger.severe("Server failed to start: " + e.getMessage());

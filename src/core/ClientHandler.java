@@ -13,8 +13,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import java.util.logging.Logger;
+
+import config.ServerConfig;
 
 public class ClientHandler {
 
@@ -27,13 +30,16 @@ public class ClientHandler {
     private long lastActivityTime;
     private final long timeoutMs = 10000;
     private final Logger logger = ServerLogger.get();
+    private final List<ServerConfig> virtualHosts;
+    private ServerConfig currentConfig;
 
-    public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey) {
+    public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey, List<ServerConfig> virtualHosts) {
         this.client = clientChannel;
         this.selectionKey = selectionKey;
         this.readBuffer = ByteBuffer.allocate(8192);
         this.parser = new RequestParser();
         this.lastActivityTime = System.currentTimeMillis();
+        this.virtualHosts = virtualHosts;
     }
 
     public void read() throws IOException {
@@ -72,7 +78,8 @@ public class ClientHandler {
     }
 
     private void handleRequest(HttpRequest currentRequest) {
-        logger.info("Received: " + currentRequest.getMethod() + " " + currentRequest.getPath());
+        String hostHeader = currentRequest.getHeaders().get("Host");
+        this.currentConfig = resolveConfig(hostHeader);
 
         keepAlive = currentRequest.shouldKeepAlive();
 
@@ -84,6 +91,8 @@ public class ClientHandler {
                 .buildResponse();
 
         responseQueue.add(response);
+        logger.info("handle request for " + currentConfig.getServerName() + ": " + currentRequest.getMethod() + " "
+                + currentRequest.getPath());
     }
 
     public void write() throws IOException {
@@ -106,6 +115,23 @@ public class ClientHandler {
                 }
             }
         }
+    }
+
+    private ServerConfig resolveConfig(String hostHeader) {
+        String hostName = (hostHeader != null && hostHeader.contains(":"))
+                ? hostHeader.split(":")[0]
+                : hostHeader;
+
+        for (ServerConfig cfg : virtualHosts) {
+            if (cfg.getServerName().equalsIgnoreCase(hostName)) {
+                return cfg;
+            }
+        }
+
+        return virtualHosts.stream()
+                .filter(ServerConfig::isDefault)
+                .findFirst()
+                .orElse(virtualHosts.get(0));
     }
 
     public SocketAddress getIpAddress() {
