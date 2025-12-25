@@ -1,8 +1,8 @@
 
 import config.AppConfig;
 import config.ConfigLoader;
+import config.ConfigValidator;
 import core.Server;
-import java.io.IOException;
 import java.util.logging.Logger;
 import utils.ServerLogger;
 
@@ -13,20 +13,18 @@ public class Main {
 
     public static void main(String[] args) {
         try {
-
             AppConfig config = ConfigLoader.load(configFileName, logger);
-
-            System.out.println(config.toString());
-
             if (config == null || config.getServers() == null) {
                 logger.severe("Configuration loading failed!");
                 return;
             }
 
+            ConfigValidator.validateDuplicateServerName(config);
+
             Server server = new Server();
             server.start(config.getServers());
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.severe("Server failed to start: " + e.getMessage());
         }
     }

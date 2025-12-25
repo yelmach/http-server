@@ -28,7 +28,9 @@ public class Server {
 
         Map<Integer, List<ServerConfig>> portMapping = new HashMap<>();
         for (ServerConfig config : configs) {
-            portMapping.computeIfAbsent(config.getPorts().get(0), k -> new ArrayList<>()).add(config);
+            for (int port : config.getPorts()) {
+                portMapping.computeIfAbsent(port, k -> new ArrayList<>()).add(config);
+            }
         }
 
         for (Map.Entry<Integer, List<ServerConfig>> entry : portMapping.entrySet()) {
