@@ -79,8 +79,7 @@ public class ConfigLoader {
 
             if (serverConfig.isDefault()) {
                 if (config.getDefaultServer() != null) {
-                    throw new RuntimeException(
-                            "Conflict: Multiple default servers!");
+                    throw new RuntimeException("Conflict: Multiple default servers!");
                 }
                 config.setDefaultServer(serverConfig);
             }
@@ -96,6 +95,10 @@ public class ConfigLoader {
             RouteConfig routeConfig = new RouteConfig();
             routeConfig.setPath((String) route.get("path"));
             routeConfig.setRoot((String) route.get("root"));
+            routeConfig.setIndex((String) route.get("index"));
+            routeConfig.setDirectoryListing((Boolean) route.get("directoryListing"));
+            routeConfig.setUploadPath((String) route.get("uploadPath"));
+            routeConfig.setRedirectTo((String) route.get("redirectTo"));
             routeConfig.setMethods((List<String>) route.get("methods"));
 
             routesConfigs.add(routeConfig);

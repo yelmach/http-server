@@ -2,6 +2,7 @@
 import config.AppConfig;
 import config.ConfigLoader;
 import core.Server;
+import java.io.IOException;
 import java.util.logging.Logger;
 import utils.ServerLogger;
 
@@ -18,13 +19,13 @@ public class Main {
                 return;
             }
 
-            System.out.println(config.toString());
+            System.out.println(config.getServers().get(0).getRoutes().toString());
 
             Server server = new Server();
             server.start(config.getServers());
 
-        } catch (Exception e) {
-            logger.severe("Server failed to start: " + e.getMessage());
+        } catch (IOException e) {
+            logger.severe(() -> "Server failed to start: " + e.getMessage());
         }
     }
 }

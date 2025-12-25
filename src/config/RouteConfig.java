@@ -1,5 +1,7 @@
 package config;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 public class RouteConfig {
@@ -7,6 +9,10 @@ public class RouteConfig {
     private String path;
     private String root;
     private List<String> methods;
+    private String index;
+    private Boolean directoryListing;
+    private String uploadPath;
+    private String redirectTo;
 
     public String getPath() {
         return path;
@@ -29,16 +35,59 @@ public class RouteConfig {
     }
 
     public void setMethods(List<String> methods) {
+        HashSet<String> allowedMethods = new HashSet<>(Arrays.asList("GET", "POST", "DELETE"));
+        for (String method : methods) {
+            if (!allowedMethods.contains(method)) {
+                throw new RuntimeException("Conflict: Method '" + method + "' not supported!");
+            }
+        }
         this.methods = methods;
+    }
+
+    public Boolean getDirectoryListing() {
+        return directoryListing;
+    }
+
+    public void setDirectoryListing(Boolean directoryListing) {
+        this.directoryListing = directoryListing;
+    }
+
+    public String getIndex() {
+        return index;
+    }
+
+    public void setIndex(String index) {
+        this.index = index;
+    }
+
+    public String getUploadPath() {
+        return uploadPath;
+    }
+
+    public void setUploadPath(String uploadPath) {
+        this.uploadPath = uploadPath;
     }
 
     @Override
     public String toString() {
-        return "RouteConfig {"
-                + "path='" + path + '\''
-                + ", root='" + root + '\''
-                + ", methods=" + methods
-                + '}';
+        StringBuilder sb = new StringBuilder();
+        sb.append("\nRouteConfig {\n")
+                .append("  path='").append(path).append("',\n")
+                .append("  root='").append(root).append("',\n")
+                .append("  methods=").append(methods).append(",\n")
+                .append("  index=").append(index).append(",\n")
+                .append("  directoryListing=").append(directoryListing).append(",\n")
+                .append("  uploadPath=").append(uploadPath).append(",\n")
+                .append("  redirectTo=").append(redirectTo).append(",\n")
+                .append("}");
+        return sb.toString();
     }
 
+    public String getRedirectTo() {
+        return redirectTo;
+    }
+
+    public void setRedirectTo(String redirectTo) {
+        this.redirectTo = redirectTo;
+    }
 }
