@@ -1,17 +1,29 @@
 package config;
 
-public class ServerConfig {
-    private String host;
-    private int port;
-    private String root;
+import java.util.List;
+import java.util.Map;
 
-    public ServerConfig(String host, int port, String root) {
-        this.host = host;
-        this.port = port;
-        this.root = root;
+public class ServerConfig {
+
+    private String serverName;
+    private String host;
+    private Integer maxBodySize;
+    private List<Integer> ports;
+    private Map<String, String> errorPages;
+    private List<RouteConfig> routes;
+    private Boolean isDefault;
+
+    // Getters and setters
+    public String getServerName() {
+        return serverName;
     }
 
-    public ServerConfig() {
+    public void setServerName(String serverName) {
+        this.serverName = serverName;
+    }
+
+    public List<Integer> getPorts() {
+        return ports;
     }
 
     public String getHost() {
@@ -22,25 +34,55 @@ public class ServerConfig {
         this.host = host;
     }
 
-    public int getPort() {
-        return port;
+    public void setPorts(List<Integer> ports) {
+        this.ports = ports;
     }
 
-    public void setPort(int port) {
-        this.port = port;
+    public List<RouteConfig> getRoutes() {
+        return routes;
     }
 
-    public String getRoot() {
-        return root;
+    public void setRoutes(List<RouteConfig> routes) {
+        this.routes = routes;
     }
 
-    public void setRoot(String root) {
-        this.root = root;
+    public Map<String, String> getErrorPages() {
+        return errorPages;
+    }
+
+    public void setErrorPages(Map<String, String> errorPages) {
+        this.errorPages = errorPages;
+    }
+
+    public Boolean isDefault() {
+        return isDefault;
+    }
+
+    public void setIsDefault(Boolean isDefault) {
+        this.isDefault = isDefault;
+    }
+
+    public Integer getMaxBodySize() {
+        return maxBodySize;
+    }
+
+    public void setMaxBodySize(Integer maxBodySize) {
+        this.maxBodySize = maxBodySize;
     }
 
     @Override
     public String toString() {
-        return "ServerConfig [host=" + host + ", port=" + port + ", root=" + root + "]";
+        StringBuilder sb = new StringBuilder();
+        sb.append("ServerConfig {\n")
+                .append("  serverName='").append(serverName).append("',\n")
+                .append("  host='").append(host).append("',\n")
+                .append("  maxBodySize=").append(maxBodySize).append(",\n")
+                .append("  ports=").append(ports).append(",\n")
+                .append("  defaultServer=").append(isDefault).append(",\n")
+                .append("  errorPages=").append(errorPages).append(",\n")
+                .append("  routes=").append(routes == null ? "[]" : routes).append("\n")
+                .append("}");
+        return sb.toString();
     }
 
 }
