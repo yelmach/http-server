@@ -51,7 +51,6 @@ public class ConfigLoader {
             String host = (String) serverMap.get("host");
             String serverName = (String) serverMap.get("serverName");
             Integer maxBodySize = (Integer) serverMap.get("maxBodySize");
-            Integer timeout = (Integer) serverMap.get("timeout");
             Boolean isDefault = (Boolean) serverMap.get("defaultServer");
             List<Integer> ports = (List<Integer>) serverMap.get("ports");
             Map<String, String> errorPages = (Map<String, String>) serverMap.get("errorPages");
@@ -69,7 +68,6 @@ public class ConfigLoader {
             serverConfig.setServerName(serverName);
             serverConfig.setHost(host);
             serverConfig.setMaxBodySize(maxBodySize);
-            serverConfig.setTimeout(timeout);
             serverConfig.setPorts(ports);
             serverConfig.setErrorPages(errorPages);
             serverConfig.setIsDefault(isDefault != null ? isDefault : false);

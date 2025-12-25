@@ -7,7 +7,6 @@
       "ports": [8080],
       "serverName": "localhost",
       "defaultServer": true,
-      "timeout": 30000,
       "maxBodySize": 1048576,
       "errorPages": {
         "404": "/error/404.html",
