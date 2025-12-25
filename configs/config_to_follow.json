@@ -5,7 +5,6 @@
       "port": 8080, 
       "serverName": "localhost",
       "defaultServer": true,
-      "root": "./www",        
       "maxBodySize": 1048576,
       "errorPages": {
         "404": "/error/404.html",

@@ -1,7 +1,6 @@
 
 import config.AppConfig;
 import config.ConfigLoader;
-import config.ConfigValidator;
 import core.Server;
 import java.util.logging.Logger;
 import utils.ServerLogger;
@@ -19,7 +18,7 @@ public class Main {
                 return;
             }
 
-            ConfigValidator.validateDuplicateServerName(config);
+            System.out.println(config.toString());
 
             Server server = new Server();
             server.start(config.getServers());

@@ -7,6 +7,8 @@ public class ServerConfig {
 
     private String serverName;
     private String host;
+    private Integer maxBodySize;
+    private Integer timeout;
     private List<Integer> ports;
     private Map<String, String> errorPages;
     private List<RouteConfig> routes;
@@ -61,13 +63,32 @@ public class ServerConfig {
         this.isDefault = isDefault;
     }
 
+    public Integer getMaxBodySize() {
+        return maxBodySize;
+    }
+
+    public void setMaxBodySize(Integer maxBodySize) {
+        this.maxBodySize = maxBodySize;
+    }
+
+    public Integer getTimeout() {
+        return timeout;
+    }
+
+    public void setTimeout(Integer timeout) {
+        this.timeout = timeout;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("ServerConfig {\n")
                 .append("  serverName='").append(serverName).append("',\n")
                 .append("  host='").append(host).append("',\n")
+                .append("  maxBodySize=").append(maxBodySize).append(",\n")
+                .append("  timeout=").append(timeout).append(",\n")
                 .append("  ports=").append(ports).append(",\n")
+                .append("  defaultServer=").append(isDefault).append(",\n")
                 .append("  errorPages=").append(errorPages).append(",\n")
                 .append("  routes=").append(routes == null ? "[]" : routes).append("\n")
                 .append("}");

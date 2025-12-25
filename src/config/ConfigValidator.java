@@ -1,8 +1,6 @@
 package config;
 
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 
 import utils.ServerLogger;
@@ -46,6 +44,12 @@ public class ConfigValidator {
                 return false;
             }
 
+            Object defaultServer = server.get("defaultServer");
+            if (defaultServer != null && !(defaultServer instanceof Boolean)) {
+                logger.severe("Invalid or missing 'ports' field in server.");
+                return false;
+            }
+
             Object routes = server.get("routes");
             if (routes instanceof java.util.List) {
                 for (Object routeObj : (java.util.List<?>) routes) {
@@ -71,25 +75,5 @@ public class ConfigValidator {
         }
 
         return true;
-    }
-
-    public static void validateDuplicateServerName(AppConfig config) throws RuntimeException {
-        Set<String> identitySet = new HashSet<>();
-
-        for (ServerConfig server : config.getServers()) {
-            String host = server.getServerName();
-
-            for (int port : server.getPorts()) {
-                String identityKey = port + ":" + host;
-
-                if (identitySet.contains(identityKey)) {
-                    throw new RuntimeException(
-                            "Conflict: Multiple servers bound to port " + port + " with server name '" + host + "'");
-                }
-
-                identitySet.add(identityKey);
-            }
-
-        }
     }
 }
