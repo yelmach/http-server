@@ -19,8 +19,6 @@ public class Main {
                 return;
             }
 
-            System.out.println(config.getServers().get(0).getRoutes().toString());
-
             Server server = new Server();
             server.start(config.getServers());
 
