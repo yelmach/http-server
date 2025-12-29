@@ -2,7 +2,7 @@
   "servers": [
     {
       "host": "127.0.0.1",
-      "port": 8080, 
+      "port": 8080,
       "serverName": "localhost",
       "defaultServer": true,
       "maxBodySize": 1048576,
@@ -13,18 +13,20 @@
       "routes": [
         {
           "path": "/",
-          "methods": ["GET", "DELETE"], 
+          "methods": ["GET"],
           "root": "./www/html",
-          "index": "index.html",
-          "directoryListing": true,
-          "uploadPath": "./www/uploads" 
+          "index": "index.html"
         },
         {
           "path": "/uploads",
           "methods": ["GET", "POST", "DELETE"],
-          "root": "./www/uploads",
-          "directoryListing": false,
-          "uploadPath": "./www/uploads"
+          "root": "./www/uploads"
+        },
+        {
+          "path": "/",
+          "methods": ["GET"],
+          "root": "./www",
+          "directoryListing": true
         },
         {
           "path": "/old-page",
