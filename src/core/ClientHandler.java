@@ -87,7 +87,7 @@ public class ClientHandler {
                 .status(HttpStatusCode.OK)
                 .keepAlive(keepAlive)
                 .contentType("text/plain")
-                .body("request parsed successfully")
+                .body(currentConfig.getHost() + ":" + currentConfig.getPorts() + " host header: " + currentConfig.getServerName())
                 .buildResponse();
 
         responseQueue.add(response);

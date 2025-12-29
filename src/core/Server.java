@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import config.ServerConfig;
 import utils.ServerLogger;
@@ -19,30 +20,37 @@ import utils.ServerLogger;
 public class Server {
 
     private Selector selector;
-    private ServerSocketChannel serverSocket;
     private final Logger logger = ServerLogger.get();
 
     public void start(List<ServerConfig> configs) throws IOException {
 
         selector = Selector.open();
 
-        Map<Integer, List<ServerConfig>> portMapping = new HashMap<>();
+        Map<String, List<ServerConfig>> socketBindings = new HashMap<>();
         for (ServerConfig config : configs) {
+            String host = config.getHost();
+
             for (int port : config.getPorts()) {
-                portMapping.computeIfAbsent(port, k -> new ArrayList<>()).add(config);
+                String bindKey = host + ":" + port;
+                socketBindings.computeIfAbsent(bindKey, k -> new ArrayList<>()).add(config);
             }
         }
 
-        for (Map.Entry<Integer, List<ServerConfig>> entry : portMapping.entrySet()) {
-            int port = entry.getKey();
+        for (Map.Entry<String, List<ServerConfig>> entry : socketBindings.entrySet()) {
+            String bindKey = entry.getKey();
             List<ServerConfig> virtualHosts = entry.getValue();
 
-            serverSocket = ServerSocketChannel.open();
-            serverSocket.bind(new InetSocketAddress(port));
+            String[] parts = bindKey.split(":");
+            String host = parts[0];
+            int port = Integer.parseInt(parts[1]);
+
+            ServerSocketChannel serverSocket = ServerSocketChannel.open();
+            serverSocket.bind(new InetSocketAddress(host, port));
             serverSocket.configureBlocking(false);
             serverSocket.register(selector, SelectionKey.OP_ACCEPT, virtualHosts);
 
-            logger.info("Server started on port: " + port + " with " + virtualHosts.size() + " virtual hosts.");
+            logger.info("Server bound to " + host + ":" + port + " with " + virtualHosts.size() + " virtual hosts: " +
+                    virtualHosts.stream().map(ServerConfig::getServerName).collect(Collectors.joining(", ")));
         }
 
         while (true) {

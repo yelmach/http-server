@@ -1,0 +1,86 @@
+{
+  "name": "Multi-Host Test Environment",
+  "version": "1.0.0",
+  "servers": [
+    {
+      "comment": "--- SCENARIO 1: Virtual Host A (Primary) on 127.0.0.1:8080 ---",
+      "serverName": "primary.local",
+      "host": "127.0.0.1",
+      "ports": [8080],
+      "defaultServer": true,
+      "maxBodySize": 1024,
+      "errorPages": {
+        "404": "./www/error/404.html"
+      },
+      "routes": [
+        {
+          "path": "/",
+          "root": "./www/html/primary",
+          "methods": ["GET"],
+          "index": "index.html",
+          "directoryListing": true
+        }
+      ]
+    },
+    {
+      "comment": "--- SCENARIO 1: Virtual Host B (Secondary) on 127.0.0.1:8080 ---",
+      "serverName": "secondary.local",
+      "host": "127.0.0.1",
+      "ports": [8080],
+      "defaultServer": false,
+      "maxBodySize": 1024,
+      "errorPages": {
+        "404": "./www/error/404.html"
+      },
+      "routes": [
+        {
+          "path": "/",
+          "root": "./www/html/secondary",
+          "methods": ["GET"],
+          "index": "index.html",
+          "directoryListing": false
+        }
+      ]
+    },
+    {
+      "comment": "--- SCENARIO 2: IP Isolation on 127.0.0.2:8080 (Same port, diff IP) ---",
+      "serverName": "ip2.local",
+      "host": "127.0.0.2",
+      "ports": [8080],
+      "defaultServer": false,
+      "maxBodySize": 1024,
+      "errorPages": {
+        "404": "./www/error/404.html"
+      },
+      "routes": [
+        {
+          "path": "/",
+          "root": "./www/html/ip2",
+          "methods": ["GET"],
+          "index": "index.html",
+          "directoryListing": true
+        }
+      ]
+    },
+    {
+      "comment": "--- SCENARIO 3: Port Isolation on 127.0.0.1:9090 ---",
+      "serverName": "port9090.local",
+      "host": "127.0.0.1",
+      "ports": [9090],
+      "defaultServer": false,
+      "maxBodySize": 1024,
+      "errorPages": {
+        "404": "./www/error/404.html"
+      },
+      "routes": [
+        {
+          "path": "/",
+          "root": "./www/html/9090",
+          "methods": ["GET"],
+          "index": "index.html",
+          "directoryListing": true
+        }
+      ]
+    }
+  ]
+}

@@ -11,8 +11,16 @@ public class RouteConfig {
     private List<String> methods;
     private String index;
     private Boolean directoryListing;
-    private String uploadPath;
     private String redirectTo;
+    private String cgiExtension;
+
+    public String getCgiExtension() {
+        return cgiExtension;
+    }
+
+    public void setCgiExtension(String cgiExtension) {
+        this.cgiExtension = cgiExtension;
+    }
 
     public String getPath() {
         return path;
@@ -60,14 +68,6 @@ public class RouteConfig {
         this.index = index;
     }
 
-    public String getUploadPath() {
-        return uploadPath;
-    }
-
-    public void setUploadPath(String uploadPath) {
-        this.uploadPath = uploadPath;
-    }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -77,7 +77,6 @@ public class RouteConfig {
                 .append("  methods=").append(methods).append(",\n")
                 .append("  index=").append(index).append(",\n")
                 .append("  directoryListing=").append(directoryListing).append(",\n")
-                .append("  uploadPath=").append(uploadPath).append(",\n")
                 .append("  redirectTo=").append(redirectTo).append(",\n")
                 .append("}");
         return sb.toString();
