@@ -1,5 +1,14 @@
 package handlers;
 
-public class RedirectHandler {
+import http.HttpRequest;
+import http.ResponseBuilder;
+
+public class RedirectHandler implements Handler {
+
+    @Override
+    public void handle(HttpRequest request, ResponseBuilder response) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'handle'");
+    }
     
 }
