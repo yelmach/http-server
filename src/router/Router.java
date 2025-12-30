@@ -7,6 +7,7 @@ import java.util.Optional;
 import config.RouteConfig;
 import config.ServerConfig;
 import handlers.CGIHandler;
+import handlers.DeleteHandler;
 import handlers.DirectoryHandler;
 import handlers.ErrorHandler;
 import handlers.Handler;
@@ -21,7 +22,7 @@ public class Router {
     public Handler route(HttpRequest httpRequest, ServerConfig serverConfig) {
         String requestPath = httpRequest.getPath();
 
-        // 1. Find the best matching RouteConfig
+        // 1. Find matching route
         Optional<RouteConfig> matchingRoute = findMatchingRoute(requestPath, serverConfig);
         if (matchingRoute.isEmpty()) {
             return new ErrorHandler(HttpStatusCode.NOT_FOUND, serverConfig);
@@ -31,15 +32,15 @@ public class Router {
 
         // 2. Handle Redirection (301/302)
         if (route.getRedirectTo() != null) {
-            return new RedirectHandler();
+            return new RedirectHandler(route.getRedirectTo());
         }
 
-        // 3. Method Validation (405 Method Not Allowed)
+        // 3. Method validation
         if (!route.getMethods().contains(httpRequest.getMethod().toString())) {
             return new ErrorHandler(HttpStatusCode.METHOD_NOT_ALLOWED, serverConfig);
         }
 
-        // 4. Resolve the File System Path
+        // 4. Resolve filesystem path
         String fsPath = resolveFilesystemPath(requestPath, route);
         File resource = new File(fsPath);
 
@@ -49,35 +50,42 @@ public class Router {
         }
 
         // 5. CGI detection (Extension Match)
-        if (route.getCgiExtension() != null && requestPath.endsWith(route.getCgiExtension())) {
-            return new CGIHandler();
+        if (route.getCgiExtension() != null &&
+                requestPath.endsWith(route.getCgiExtension()) &&
+                resource.isFile() &&
+                resource.getName().endsWith(route.getCgiExtension())) {
+            return new CGIHandler(route, resource);
         }
 
-        // 6. Handle Uploads and Deletions (POST/DELETE)
-        if (httpRequest.getMethod().name().equals("POST") || httpRequest.getMethod().name().equals("DELETE")) {
-            return new UploadHandler();
+        // 6. Handle POST (uploads)
+        if (httpRequest.getMethod().name().equals("POST")) {
+            return new UploadHandler(route, resource);
         }
 
-        // 7. Handle GET (Static Files or Directories)
+        // 7. Handle DELETE
+        if (httpRequest.getMethod().name().equals("DELETE")) {
+            return new DeleteHandler(route, resource);
+        }
+
+        // 8. Handle directories
         if (resource.isDirectory()) {
             if (route.getDirectoryListing()) {
-                return new DirectoryHandler();
+                return new DirectoryHandler(route, resource);
             }
 
             // Check if index file exists
             File indexFile = new File(resource, route.getIndex() != null ? route.getIndex() : "index.html");
             if (indexFile.exists()) {
-                return new StaticFileHandler();
+                return new StaticFileHandler(route, indexFile);
             }
 
             return new ErrorHandler(HttpStatusCode.FORBIDDEN, serverConfig);
         }
 
         if (resource.exists()) {
-            return new StaticFileHandler();
+            return new StaticFileHandler(route, resource);
         }
 
-        // 8. Default: Not Found
         return new ErrorHandler(HttpStatusCode.NOT_FOUND, serverConfig);
     }
 
