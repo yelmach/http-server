@@ -69,21 +69,21 @@ public class Router {
 
         // 8. Handle directories
         if (resource.isDirectory()) {
-            if (route.getDirectoryListing()) {
+            if (Boolean.TRUE.equals(route.getDirectoryListing())) {
                 return new DirectoryHandler(route, resource);
             }
 
             // Check if index file exists
             File indexFile = new File(resource, route.getIndex() != null ? route.getIndex() : "index.html");
             if (indexFile.exists()) {
-                return new StaticFileHandler(route, indexFile);
+                return new StaticFileHandler(indexFile);
             }
 
             return new ErrorHandler(HttpStatusCode.FORBIDDEN, serverConfig);
         }
 
         if (resource.exists()) {
-            return new StaticFileHandler(route, resource);
+            return new StaticFileHandler(resource);
         }
 
         return new ErrorHandler(HttpStatusCode.NOT_FOUND, serverConfig);
