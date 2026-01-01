@@ -1,14 +1,19 @@
 package handlers;
 
+import java.io.File;
+
+import config.RouteConfig;
 import http.HttpRequest;
 import http.ResponseBuilder;
 
-public class RedirectHandler implements Handler {
+public class DeleteHandler implements Handler {
 
-    private String redirectTo;
+    private RouteConfig route;
+    private File resource;
 
-    public RedirectHandler(String redirectTo) {
-        this.redirectTo = redirectTo;
+    public DeleteHandler(RouteConfig route, File resource) {
+        this.route = route;
+        this.resource = resource;
     }
 
     @Override
