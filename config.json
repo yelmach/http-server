@@ -4,16 +4,28 @@
   "servers": [
     {
       "host": "127.0.0.1",
-      "ports": [8080],
+      "ports": [
+        8080
+      ],
       "serverName": "localhost",
       "defaultServer": true,
       "maxBodySize": 1048576,
       "routes": [
         {
           "path": "/",
-          "methods": ["GET"],
+          "methods": [
+            "GET"
+          ],
           "root": "./www",
           "index": "index.html"
+        },
+        {
+          "path": "/images/",
+          "methods": [
+            "GET"
+          ],
+          "root": "./www/images",
+          "directoryListing": true
         }
       ]
     }
