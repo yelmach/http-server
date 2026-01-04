@@ -32,7 +32,10 @@ public class Router {
 
         // 2. Handle Redirection (301/302)
         if (route.getRedirectTo() != null) {
-            return new RedirectHandler(route.getRedirectTo());
+            HttpStatusCode statusCode = route.getRedirectStatusCode() != null && route.getRedirectStatusCode() == 302
+                    ? HttpStatusCode.FOUND
+                    : HttpStatusCode.MOVED_PERMANENTLY;
+            return new RedirectHandler(route.getRedirectTo(), statusCode);
         }
 
         // 3. Method validation

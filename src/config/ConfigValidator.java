@@ -59,6 +59,12 @@ public class ConfigValidator {
                         logger.severe("Invalid or missing 'path' field in route.");
                         return false;
                     }
+
+                    boolean isRedirect = route.get("redirectTo") != null;
+                    if (isRedirect) {
+                        continue;
+                    }
+
                     if (route.get("root") == null || !(route.get("root") instanceof String)) {
                         logger.severe("Invalid or missing 'root' field in route.");
                         return false;

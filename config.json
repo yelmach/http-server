@@ -26,6 +26,16 @@
           ],
           "root": "./www/images",
           "directoryListing": true
+        },
+        {
+          "path": "/old-page",
+          "redirectTo": "/",
+          "redirectStatusCode": 301
+        },
+        {
+          "path": "/temp-redirect",
+          "redirectTo": "/",
+          "redirectStatusCode": 302
         }
       ]
     }
