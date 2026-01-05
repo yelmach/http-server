@@ -17,10 +17,11 @@
             "GET"
           ],
           "root": "./www",
-          "index": "index.html"
+          "index": "index.html",
+          "directoryListing": true
         },
         {
-          "path": "/images/",
+          "path": "/images",
           "methods": [
             "GET"
           ],

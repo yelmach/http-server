@@ -94,6 +94,11 @@ public class Router {
 
         return routes.stream().filter(route -> {
             String routePath = route.getPath();
+
+            if (routePath.equals("/")) {
+                return true;
+            }
+
             return requestPath.startsWith(routePath)
                     && (requestPath.length() == routePath.length() || requestPath.charAt(routePath.length()) == '/');
         }).reduce((a, b) -> a.getPath().length() > b.getPath().length() ? a : b);
