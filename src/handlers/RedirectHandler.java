@@ -18,8 +18,6 @@ public class RedirectHandler implements Handler {
     public void handle(HttpRequest request, ResponseBuilder response) {
 
         response.status(this.statusCode)
-                .header("Location", this.redirectTo)
-                .contentType("text/html")
-                .body("redirecting to " + this.redirectTo);
+                .header("Location", this.redirectTo);
     }
 }
