@@ -14,6 +14,12 @@
           "methods": ["GET"],
           "root": "./www",
           "index": "index.html"
+        },
+        {
+          "path": "/images",
+          "methods": ["GET"],
+          "root": "./www/images",
+          "directoryListing": true
         }
       ]
     }
