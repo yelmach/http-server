@@ -95,8 +95,9 @@ public class ConfigLoader {
             routeConfig.setRoot((String) route.get("root"));
             routeConfig.setIndex((String) route.get("index"));
             routeConfig.setDirectoryListing((Boolean) route.get("directoryListing"));
-            routeConfig.setUploadPath((String) route.get("uploadPath"));
+            routeConfig.setCgiExtension((String) route.get("cgiExtension"));
             routeConfig.setRedirectTo((String) route.get("redirectTo"));
+            routeConfig.setRedirectStatusCode((Integer) route.get("redirectStatusCode"));
             routeConfig.setMethods((List<String>) route.get("methods"));
 
             routesConfigs.add(routeConfig);

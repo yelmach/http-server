@@ -5,6 +5,7 @@ import http.HttpStatusCode;
 import http.ParsingResult;
 import http.RequestParser;
 import http.ResponseBuilder;
+import router.Router;
 import utils.ServerLogger;
 
 import java.io.IOException;
@@ -18,6 +19,8 @@ import java.util.Queue;
 import java.util.logging.Logger;
 
 import config.ServerConfig;
+import handlers.ErrorHandler;
+import handlers.Handler;
 
 public class ClientHandler {
 
@@ -81,16 +84,28 @@ public class ClientHandler {
         String hostHeader = currentRequest.getHeaders().get("Host");
         this.currentConfig = resolveConfig(hostHeader);
 
+        Router router = new Router();
+        Handler handler = router.route(currentRequest, currentConfig);
+        ResponseBuilder responseBuilder = new ResponseBuilder();
+
+        try {
+            handler.handle(currentRequest, responseBuilder);
+        } catch (Exception e) {
+            ErrorHandler errorHandler = new ErrorHandler(HttpStatusCode.INTERNAL_SERVER_ERROR, currentConfig);
+            errorHandler.handle(currentRequest, responseBuilder);
+        }
+
         keepAlive = currentRequest.shouldKeepAlive();
 
-        ByteBuffer response = new ResponseBuilder()
-                .status(HttpStatusCode.OK)
-                .keepAlive(keepAlive)
-                .contentType("text/plain")
-                .body("request parsed successfully")
-                .buildResponse();
+        // ByteBuffer response = responseBuilder.status(HttpStatusCode.OK)
+        // .keepAlive(keepAlive)
+        // .contentType("text/plain")
+        // .body(currentConfig.getHost() + ":" + currentConfig.getPorts() + "
+        // hostheader: "
+        // + currentConfig.getServerName())
+        // .buildResponse();
 
-        responseQueue.add(response);
+        responseQueue.add(responseBuilder.buildResponse());
         logger.info("handle request for " + currentConfig.getServerName() + ": " + currentRequest.getMethod() + " "
                 + currentRequest.getPath());
     }

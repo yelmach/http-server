@@ -8,37 +8,40 @@
       "serverName": "localhost",
       "defaultServer": true,
       "maxBodySize": 1048576,
-      "errorPages": {
-        "404": "/error/404.html",
-        "500": "/error/500.html"
-      },
       "routes": [
         {
           "path": "/",
-          "methods": ["GET", "DELETE"],
-          "root": "./www/html",
-          "index": "index.html",
-          "directoryListing": true,
-          "uploadPath": "./www/uploads"
+          "methods": ["GET"],
+          "root": "./www",
+          "index": "index.html"
         },
         {
-          "path": "/uploads",
-          "methods": ["GET", "POST", "DELETE"],
-          "root": "./www/uploads",
-          "directoryListing": false,
-          "uploadPath": "./www/uploads"
+          "path": "/images",
+          "methods": ["GET"],
+          "root": "./www/images",
+          "directoryListing": true
+        },
+        {
+          "path": "/cgi-1",
+          "root": "./www/scripts/cgi-1.py",
+          "methods": ["GET"],
+          "cgiExtension": "py"
+        },
+        {
+          "path": "/cgi-2",
+          "root": "./www/scripts/cgi-2.py",
+          "methods": ["GET"],
+          "cgiExtension": "py"
         },
         {
           "path": "/old-page",
-          "root": "./www/uploads",
-          "methods": ["GET", "POST", "DELETE"],
-          "redirectTo": "/new-page"
+          "redirectTo": "/",
+          "redirectStatusCode": 301
         },
         {
-          "path": "/cgi-bin",
-          "root": "./www/scripts",
-          "methods": ["GET", "POST"],
-          "cgiExtension": ".py"
+          "path": "/temp-redirect",
+          "redirectTo": "/",
+          "redirectStatusCode": 302
         }
       ]
     }

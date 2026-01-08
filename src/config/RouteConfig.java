@@ -11,8 +11,17 @@ public class RouteConfig {
     private List<String> methods;
     private String index;
     private Boolean directoryListing;
-    private String uploadPath;
     private String redirectTo;
+    private Integer redirectStatusCode;
+    private String cgiExtension;
+
+    public String getCgiExtension() {
+        return cgiExtension;
+    }
+
+    public void setCgiExtension(String cgiExtension) {
+        this.cgiExtension = cgiExtension;
+    }
 
     public String getPath() {
         return path;
@@ -35,6 +44,10 @@ public class RouteConfig {
     }
 
     public void setMethods(List<String> methods) {
+        if (methods == null) {
+            this.methods = null;
+            return;
+        }
         HashSet<String> allowedMethods = new HashSet<>(Arrays.asList("GET", "POST", "DELETE"));
         for (String method : methods) {
             if (!allowedMethods.contains(method)) {
@@ -60,14 +73,6 @@ public class RouteConfig {
         this.index = index;
     }
 
-    public String getUploadPath() {
-        return uploadPath;
-    }
-
-    public void setUploadPath(String uploadPath) {
-        this.uploadPath = uploadPath;
-    }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -77,8 +82,8 @@ public class RouteConfig {
                 .append("  methods=").append(methods).append(",\n")
                 .append("  index=").append(index).append(",\n")
                 .append("  directoryListing=").append(directoryListing).append(",\n")
-                .append("  uploadPath=").append(uploadPath).append(",\n")
                 .append("  redirectTo=").append(redirectTo).append(",\n")
+                .append("  redirectStatusCode=").append(redirectStatusCode).append(",\n")
                 .append("}");
         return sb.toString();
     }
@@ -89,5 +94,13 @@ public class RouteConfig {
 
     public void setRedirectTo(String redirectTo) {
         this.redirectTo = redirectTo;
+    }
+
+    public Integer getRedirectStatusCode() {
+        return redirectStatusCode;
+    }
+
+    public void setRedirectStatusCode(Integer redirectStatusCode) {
+        this.redirectStatusCode = redirectStatusCode;
     }
 }

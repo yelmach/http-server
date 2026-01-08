@@ -10,7 +10,9 @@ public enum HttpStatusCode {
     URI_TOO_LONG(414, "URI Too Long"),
     HEADER_FIELDS_TOO_LARGE(431, "Request Header Fields Too Large"),
     INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
-    NOT_IMPLEMENTED(501, "Not Implemented");
+    NOT_IMPLEMENTED(501, "Not Implemented"),
+    MOVED_PERMANENTLY(301, "Moved Permanently"),
+    FOUND(302, "Found");
 
     private final int code;
     private final String reasonPhrase;
