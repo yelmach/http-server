@@ -12,6 +12,7 @@ public class RouteConfig {
     private String index;
     private Boolean directoryListing;
     private String redirectTo;
+    private Integer redirectStatusCode;
     private String cgiExtension;
 
     public String getCgiExtension() {
@@ -43,6 +44,10 @@ public class RouteConfig {
     }
 
     public void setMethods(List<String> methods) {
+        if (methods == null) {
+            this.methods = null;
+            return;
+        }
         HashSet<String> allowedMethods = new HashSet<>(Arrays.asList("GET", "POST", "DELETE"));
         for (String method : methods) {
             if (!allowedMethods.contains(method)) {
@@ -78,6 +83,7 @@ public class RouteConfig {
                 .append("  index=").append(index).append(",\n")
                 .append("  directoryListing=").append(directoryListing).append(",\n")
                 .append("  redirectTo=").append(redirectTo).append(",\n")
+                .append("  redirectStatusCode=").append(redirectStatusCode).append(",\n")
                 .append("}");
         return sb.toString();
     }
@@ -88,5 +94,13 @@ public class RouteConfig {
 
     public void setRedirectTo(String redirectTo) {
         this.redirectTo = redirectTo;
+    }
+
+    public Integer getRedirectStatusCode() {
+        return redirectStatusCode;
+    }
+
+    public void setRedirectStatusCode(Integer redirectStatusCode) {
+        this.redirectStatusCode = redirectStatusCode;
     }
 }
