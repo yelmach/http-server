@@ -2,12 +2,11 @@ package config;
 
 import java.util.Map;
 import java.util.logging.Logger;
-
 import utils.ServerLogger;
 
 public class ConfigValidator {
 
-    private static Logger logger = ServerLogger.get();
+    private final static Logger logger = ServerLogger.get();
 
     public static boolean validateGeneralFields(Map<String, Object> json) {
         if (json.get("name") == null || !(json.get("name") instanceof String)) {
@@ -71,6 +70,12 @@ public class ConfigValidator {
                     }
                     if (route.get("methods") == null || !(route.get("methods") instanceof java.util.List)) {
                         logger.severe("Invalid or missing 'methods' field in route.");
+                        return false;
+                    }
+
+                    Object ext = route.get("cgiExtension");
+                    if (ext != null && (!(ext instanceof String) || !ext.equals("py"))) {
+                        logger.severe("Invalid or missing 'cgiExtension' field in route.");
                         return false;
                     }
                 }

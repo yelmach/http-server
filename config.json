@@ -22,6 +22,18 @@
           "directoryListing": true
         },
         {
+          "path": "/cgi-1",
+          "root": "./www/scripts/cgi-1.py",
+          "methods": ["GET"],
+          "cgiExtension": "py"
+        },
+        {
+          "path": "/cgi-2",
+          "root": "./www/scripts/cgi-2.py",
+          "methods": ["GET"],
+          "cgiExtension": "py"
+        },
+        {
           "path": "/old-page",
           "redirectTo": "/",
           "redirectStatusCode": 301

@@ -52,10 +52,9 @@ public class Router {
         }
 
         // 5. CGI detection (Extension Match)
-        if (route.getCgiExtension() != null &&
-                requestPath.endsWith(route.getCgiExtension()) &&
-                resource.isFile() &&
-                resource.getName().endsWith(route.getCgiExtension())) {
+        if (route.getCgiExtension() != null
+                && resource.isFile()
+                && resource.getName().endsWith(route.getCgiExtension())) {
             return new CGIHandler(route, resource);
         }
 
@@ -80,7 +79,6 @@ public class Router {
             if (indexFile.exists()) {
                 return new StaticFileHandler(indexFile);
             }
-
             return new ErrorHandler(HttpStatusCode.FORBIDDEN, serverConfig);
         }
 
