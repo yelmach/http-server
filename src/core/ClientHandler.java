@@ -41,7 +41,6 @@ public class ClientHandler {
         this.selectionKey = selectionKey;
         this.readBuffer = ByteBuffer.allocate(8192);
 
-        // Use the maximum maxBodySize across all virtual hosts
         int maxBodySize = 10 * 1024 * 1024; // default 10MB
         for (ServerConfig config : virtualHosts) {
             if (config.getMaxBodySize() > maxBodySize) {

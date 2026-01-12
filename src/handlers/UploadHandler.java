@@ -92,8 +92,8 @@ public class UploadHandler implements Handler {
 
         if (request.getBodyTempFile() != null) {
             Files.move(request.getBodyTempFile().toPath(),
-                       targetFile.toPath(),
-                       StandardCopyOption.REPLACE_EXISTING);
+                    targetFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
         } else {
             Files.write(targetFile.toPath(), request.getBody());
         }
@@ -112,8 +112,8 @@ public class UploadHandler implements Handler {
         }
 
         Files.move(part.getTempFile().toPath(),
-                   targetFile.toPath(),
-                   StandardCopyOption.REPLACE_EXISTING);
+                targetFile.toPath(),
+                StandardCopyOption.REPLACE_EXISTING);
     }
 
     private String sanitizeFilename(String filename) {
