@@ -2,6 +2,7 @@ package http;
 
 public enum HttpStatusCode {
     OK(200, "OK"),
+    CREATED(201, "Created"),
     BAD_REQUEST(400, "Bad Request"),
     FORBIDDEN(403, "Forbidden"),
     NOT_FOUND(404, "Not Found"),

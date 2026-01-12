@@ -7,7 +7,7 @@
       "ports": [8080],
       "serverName": "localhost",
       "defaultServer": true,
-      "maxBodySize": 1048576,
+      "maxBodySize": 104857600,
       "routes": [
         {
           "path": "/",
@@ -42,6 +42,11 @@
           "path": "/temp-redirect",
           "redirectTo": "/",
           "redirectStatusCode": 302
+        },
+        {
+          "path": "/upload",
+          "methods": ["POST"],
+          "root": "./www"
         }
       ]
     }

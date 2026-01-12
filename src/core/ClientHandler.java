@@ -40,7 +40,14 @@ public class ClientHandler {
         this.client = clientChannel;
         this.selectionKey = selectionKey;
         this.readBuffer = ByteBuffer.allocate(8192);
-        this.parser = new RequestParser();
+
+        int maxBodySize = 10 * 1024 * 1024; // default 10MB
+        for (ServerConfig config : virtualHosts) {
+            if (config.getMaxBodySize() > maxBodySize) {
+                maxBodySize = config.getMaxBodySize();
+            }
+        }
+        this.parser = new RequestParser(maxBodySize);
         this.lastActivityTime = System.currentTimeMillis();
         this.virtualHosts = virtualHosts;
     }
@@ -96,14 +103,6 @@ public class ClientHandler {
         }
 
         keepAlive = currentRequest.shouldKeepAlive();
-
-        // ByteBuffer response = responseBuilder.status(HttpStatusCode.OK)
-        // .keepAlive(keepAlive)
-        // .contentType("text/plain")
-        // .body(currentConfig.getHost() + ":" + currentConfig.getPorts() + "
-        // hostheader: "
-        // + currentConfig.getServerName())
-        // .buildResponse();
 
         responseQueue.add(responseBuilder.buildResponse());
         logger.info("handle request for " + currentConfig.getServerName() + ": " + currentRequest.getMethod() + " "
