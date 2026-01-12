@@ -12,7 +12,8 @@ public enum HttpStatusCode {
     INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
     NOT_IMPLEMENTED(501, "Not Implemented"),
     MOVED_PERMANENTLY(301, "Moved Permanently"),
-    FOUND(302, "Found");
+    FOUND(302, "Found"),
+    NO_CONTENT(204, "No Content");
 
     private final int code;
     private final String reasonPhrase;
