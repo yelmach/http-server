@@ -7,7 +7,7 @@
       "ports": [8080],
       "serverName": "localhost",
       "defaultServer": true,
-      "maxBodySize": 1048576,
+      "maxBodySize": 104857600,
       "routes": [
         {
           "path": "/",
@@ -20,6 +20,33 @@
           "methods": ["GET"],
           "root": "./www/images",
           "directoryListing": true
+        },
+        {
+          "path": "/cgi-1",
+          "root": "./www/scripts/cgi-1.py",
+          "methods": ["GET"],
+          "cgiExtension": "py"
+        },
+        {
+          "path": "/cgi-2",
+          "root": "./www/scripts/cgi-2.py",
+          "methods": ["GET"],
+          "cgiExtension": "py"
+        },
+        {
+          "path": "/old-page",
+          "redirectTo": "/",
+          "redirectStatusCode": 301
+        },
+        {
+          "path": "/temp-redirect",
+          "redirectTo": "/",
+          "redirectStatusCode": 302
+        },
+        {
+          "path": "/upload",
+          "methods": ["POST"],
+          "root": "./www/uploads"
         }
       ]
     }

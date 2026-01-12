@@ -1,6 +1,8 @@
 package http;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public class HttpRequest {
     private HttpMethod method;
@@ -9,6 +11,8 @@ public class HttpRequest {
     private HttpHeaders headers;
     private byte[] body;
     private String queryString;
+    private List<MultipartPart> multipartParts;
+    private File bodyTempFile;
 
     public HttpRequest() {
         this.headers = new HttpHeaders();
@@ -78,5 +82,21 @@ public class HttpRequest {
         } else {
             return connection != null && connection.equals("keep-alive");
         }
+    }
+
+    public List<MultipartPart> getMultipartParts() {
+        return multipartParts;
+    }
+
+    public void setMultipartParts(List<MultipartPart> multipartParts) {
+        this.multipartParts = multipartParts;
+    }
+
+    public File getBodyTempFile() {
+        return bodyTempFile;
+    }
+
+    public void setBodyTempFile(File bodyTempFile) {
+        this.bodyTempFile = bodyTempFile;
     }
 }
