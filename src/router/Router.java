@@ -1,9 +1,5 @@
 package router;
 
-import java.io.File;
-import java.util.List;
-import java.util.Optional;
-
 import config.RouteConfig;
 import config.ServerConfig;
 import handlers.CGIHandler;
@@ -16,6 +12,9 @@ import handlers.StaticFileHandler;
 import handlers.UploadHandler;
 import http.HttpRequest;
 import http.HttpStatusCode;
+import java.io.File;
+import java.util.List;
+import java.util.Optional;
 
 public class Router {
 
@@ -32,11 +31,14 @@ public class Router {
 
         // 2. Handle Redirection (301/302)
         if (route.getRedirectTo() != null) {
-            return new RedirectHandler(route.getRedirectTo());
+            HttpStatusCode statusCode = route.getRedirectStatusCode() != null && route.getRedirectStatusCode() == 302
+                    ? HttpStatusCode.FOUND
+                    : HttpStatusCode.MOVED_PERMANENTLY;
+            return new RedirectHandler(route.getRedirectTo(), statusCode);
         }
 
         // 3. Method validation
-        if (!route.getMethods().contains(httpRequest.getMethod().toString())) {
+        if (route.getMethods() != null && !route.getMethods().contains(httpRequest.getMethod().toString())) {
             return new ErrorHandler(HttpStatusCode.METHOD_NOT_ALLOWED, serverConfig);
         }
 
@@ -50,10 +52,9 @@ public class Router {
         }
 
         // 5. CGI detection (Extension Match)
-        if (route.getCgiExtension() != null &&
-                requestPath.endsWith(route.getCgiExtension()) &&
-                resource.isFile() &&
-                resource.getName().endsWith(route.getCgiExtension())) {
+        if (route.getCgiExtension() != null
+                && resource.isFile()
+                && resource.getName().endsWith(route.getCgiExtension())) {
             return new CGIHandler(route, resource);
         }
 
@@ -78,7 +79,6 @@ public class Router {
             if (indexFile.exists()) {
                 return new StaticFileHandler(indexFile);
             }
-
             return new ErrorHandler(HttpStatusCode.FORBIDDEN, serverConfig);
         }
 
