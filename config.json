@@ -11,7 +11,7 @@
       "routes": [
         {
           "path": "/",
-          "methods": ["GET"],
+          "methods": ["GET", "DELETE"],
           "root": "./www",
           "index": "index.html"
         },
