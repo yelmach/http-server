@@ -46,7 +46,7 @@
         {
           "path": "/upload",
           "methods": ["POST"],
-          "root": "./www/uploads"
+          "root": "./www"
         }
       ]
     }
