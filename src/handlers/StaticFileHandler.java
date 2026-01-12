@@ -1,17 +1,16 @@
 package handlers;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-
 import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ResponseBuilder;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import utils.MimeTypes;
 
 public class StaticFileHandler implements Handler {
 
-    private File file;
+    private final File file;
 
     public StaticFileHandler(File file) {
         this.file = file;

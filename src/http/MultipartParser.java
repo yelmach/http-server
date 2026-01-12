@@ -19,7 +19,6 @@ public class MultipartParser {
     private FileOutputStream currentPartOutputStream;
     private ByteArrayOutputStream currentPartContent;
     private boolean parsingPartHeaders;
-    private ByteArrayOutputStream partHeadersBuffer;
     private int bodyBytesRead;
 
     public MultipartParser(String boundary, int maxBodySize) {
@@ -27,7 +26,6 @@ public class MultipartParser {
         this.maxBodySize = maxBodySize;
         this.multipartParts = new ArrayList<>();
         this.parsingPartHeaders = true;
-        this.partHeadersBuffer = new ByteArrayOutputStream();
         this.bodyBytesRead = 0;
     }
 
@@ -256,7 +254,6 @@ public class MultipartParser {
         currentPartOutputStream = null;
         currentPartContent = null;
         parsingPartHeaders = true;
-        partHeadersBuffer = new ByteArrayOutputStream();
         bodyBytesRead = 0;
     }
 

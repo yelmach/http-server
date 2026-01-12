@@ -1,24 +1,21 @@
 package handlers;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.util.List;
-
 import config.RouteConfig;
 import http.HttpRequest;
 import http.HttpStatusCode;
 import http.MultipartPart;
 import http.ResponseBuilder;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
 
 public class UploadHandler implements Handler {
 
-    private RouteConfig route;
-    private File resource;
+    private final RouteConfig route;
 
     public UploadHandler(RouteConfig route, File resource) {
         this.route = route;
-        this.resource = resource;
     }
 
     @Override

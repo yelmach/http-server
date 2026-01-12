@@ -2,9 +2,12 @@ package http;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class HttpRequest {
+
     private HttpMethod method;
     private String path;
     private String httpVersion;
@@ -13,6 +16,7 @@ public class HttpRequest {
     private String queryString;
     private List<MultipartPart> multipartParts;
     private File bodyTempFile;
+    private final Map<String, String> cookies = new HashMap<>();
 
     public HttpRequest() {
         this.headers = new HttpHeaders();
@@ -98,5 +102,13 @@ public class HttpRequest {
 
     public void setBodyTempFile(File bodyTempFile) {
         this.bodyTempFile = bodyTempFile;
+    }
+
+    public void addCookie(String name, String value) {
+        cookies.put(name, value);
+    }
+
+    public String getCookie(String name) {
+        return cookies.get(name);
     }
 }
