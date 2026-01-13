@@ -77,6 +77,7 @@ public class ClientHandler {
             if (result.isError()) {
                 logger.severe("Parsing error: " + result.getErrorMessage());
                 close();
+                return;
             }
 
             if (!responseQueue.isEmpty()) {
@@ -129,6 +130,7 @@ public class ClientHandler {
                         selectionKey.interestOps(SelectionKey.OP_READ);
                     } else {
                         close();
+                        return;
                     }
                 }
             }
