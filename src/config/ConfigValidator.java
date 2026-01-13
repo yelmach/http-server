@@ -1,6 +1,11 @@
 package config;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 import utils.ServerLogger;
 
@@ -24,11 +29,20 @@ public class ConfigValidator {
             return false;
         }
 
+        java.util.List servers = (java.util.List) json.get("servers");
+
+        if (servers.size() > 10) {
+            logger.severe("you can't use more than 10 servers.");
+            return false;
+        }
+
         return true;
     }
 
     public static boolean validateServersFields(Map<String, Object> json) {
         Object serversObject = json.get("servers");
+        boolean foundDefault = false;
+
         for (Object serverObj : (java.util.List<?>) serversObject) {
             Map<String, Object> server = (Map<String, Object>) serverObj;
 
@@ -37,16 +51,76 @@ public class ConfigValidator {
                 return false;
             }
 
+            Object host = server.get("host");
+            if (!(host instanceof String)) {
+                logger.severe("Invalid or missing 'host' field in server.");
+                return false;
+            }
+
+            String hostStr = (String) host;
+            try {
+                InetAddress address = InetAddress.getByAddress(
+                        InetAddress.getByName(hostStr).getAddress()
+                );
+            } catch (UnknownHostException e) {
+                logger.severe("Invalid IP address: " + hostStr);
+                return false;
+            }
+
+            Object maxBodySize = server.get("maxBodySize");
+            if (maxBodySize != null) {
+                if (!(maxBodySize instanceof Integer) || (Integer) maxBodySize <= 0) {
+                    logger.severe("Invalid 'maxBodySize' field.");
+                    return false;
+                }
+            }
+
             Object ports = server.get("ports");
             if (ports == null || !(ports instanceof java.util.List)) {
                 logger.severe("Invalid or missing 'ports' field in server.");
                 return false;
             }
 
-            Object defaultServer = server.get("defaultServer");
-            if (defaultServer != null && !(defaultServer instanceof Boolean)) {
-                logger.severe("Invalid or missing 'ports' field in server.");
+            List<?> portsList = (List<?>) ports;
+
+            if (portsList.isEmpty()) {
+                logger.severe("Ports list cannot be empty.");
                 return false;
+            }
+
+            Set<Integer> seenPorts = new HashSet<>();
+
+            for (Object portObj : portsList) {
+                if (!(portObj instanceof Integer)) {
+                    logger.severe("Port must be an integer.");
+                    return false;
+                }
+
+                int port = (Integer) portObj;
+                if (port < 1 || port > 65535) {
+                    logger.severe("Invalid port number: " + port);
+                    return false;
+                }
+
+                if (!seenPorts.add(port)) {
+                    logger.severe("Duplicate port: " + port);
+                    return false;
+                }
+            }
+
+            Object defaultServer = server.get("defaultServer");
+            if (defaultServer != null) {
+                if (!(defaultServer instanceof Boolean)) {
+                    logger.severe("Invalid 'defaultServer' field in server.");
+                    return false;
+                }
+                if ((Boolean) defaultServer) {
+                    if (foundDefault) {
+                        logger.severe("Multiple default servers defined.");
+                        return false;
+                    }
+                    foundDefault = true;
+                }
             }
 
             Object routes = server.get("routes");
@@ -56,6 +130,12 @@ public class ConfigValidator {
 
                     if (route.get("path") == null || !(route.get("path") instanceof String)) {
                         logger.severe("Invalid or missing 'path' field in route.");
+                        return false;
+                    }
+                    String path = (String) route.get("path");
+
+                    if (!path.startsWith("/")) {
+                        logger.severe("Route path must start with '/': " + path);
                         return false;
                     }
 
@@ -83,6 +163,11 @@ public class ConfigValidator {
                 logger.severe("Invalid 'routes' field in server.");
                 return false;
             }
+        }
+
+        if (!foundDefault) {
+            logger.severe("No default server defined.");
+            return false;
         }
 
         return true;
