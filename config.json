@@ -52,7 +52,7 @@
         {
           "path": "/upload",
           "methods": ["POST"],
-          "root": "./www"
+          "root": "./www/uploads"
         },
         {
           "path": "/session",

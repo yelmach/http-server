@@ -11,13 +11,17 @@ public class ResponseBuilder {
     private final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.RFC_1123_DATE_TIME;
 
     private HttpStatusCode statusCode;
-    private HttpHeaders headers;
+    private final HttpHeaders headers;
     private byte[] body;
 
     public ResponseBuilder() {
         headers = new HttpHeaders();
         statusCode = HttpStatusCode.OK;
         body = new byte[0];
+    }
+
+    public HttpStatusCode getStatusCode() {
+        return statusCode;
     }
 
     public ResponseBuilder status(HttpStatusCode statusCode) {
@@ -59,8 +63,8 @@ public class ResponseBuilder {
 
         StringBuilder head = new StringBuilder();
 
-        head.append("HTTP/1.1 ")
-                .append(statusCode.getCode() + " ")
+        head.append("HTTP/1.1 ").append(statusCode.getCode())
+                .append(" ")
                 .append(statusCode.getReasonPhrase())
                 .append("\r\n");
 

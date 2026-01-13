@@ -1,75 +1,31 @@
-# Variables
-JAVAC = javac
-JAVA = java
-SRC_DIR = src
-TEST_DIR = test
 BUILD_DIR = build
 LOG_DIR = logs
-MAIN_CLASS = Main
-TEST_CLASS = http.RequestParserTest
-PORT = 8080
 
-# Find all Java source files
-SOURCES = $(shell find $(SRC_DIR) -name "*.java")
+.PHONY: all build test run clean rebuild help
 
-# Default target
-.PHONY: all
 all: build
 
-# Compile the project
-.PHONY: build
 build:
-	@echo "Compiling Java sources..."
 	@mkdir -p $(BUILD_DIR)
-	$(JAVAC) -d $(BUILD_DIR) -sourcepath $(SRC_DIR) $(SRC_DIR)/$(MAIN_CLASS).java
-	@echo "Build complete!"
+	javac -d $(BUILD_DIR) -sourcepath src src/Main.java
 
-# Compile tests
-.PHONY: build-test
-build-test: build
-	@echo "Compiling test sources..."
-	$(JAVAC) -cp $(BUILD_DIR) -d $(BUILD_DIR) -sourcepath $(SRC_DIR):$(TEST_DIR) $(TEST_DIR)/http/RequestParserTest.java
-	@echo "Test compilation complete!"
+test: build
+	javac -cp $(BUILD_DIR) -d $(BUILD_DIR) -sourcepath src:test test/http/RequestParserTest.java
+	java -cp $(BUILD_DIR) http.RequestParserTest
 
-# Run tests
-.PHONY: test
-test: build-test
-	@echo "Running unit tests..."
-	@echo ""
-	$(JAVA) -cp $(BUILD_DIR) $(TEST_CLASS)
+run: build
+	@rm -rf $(LOG_DIR)/*
+	java -cp $(BUILD_DIR) Main
 
-# Run the server
-.PHONY: run
-run: clean-logs build
-	@echo "Starting HTTP server on port :$(PORT)..."
-	$(JAVA) -cp $(BUILD_DIR) $(MAIN_CLASS)
-
-# Clean build artifacts
-.PHONY: clean
 clean:
-	@echo "Cleaning build directory..."
-	rm -rf $(BUILD_DIR)
-	@echo "Clean complete!"
+	rm -rf $(BUILD_DIR) $(LOG_DIR)/*
 
-# Clean logs
-.PHONY: clean-logs
-clean-logs:
-	@echo "Cleaning logs directory..."
-	rm -rf $(LOG_DIR)/*
+rebuild: clean build
 
-# Rebuild (clean + build)
-.PHONY: rebuild
-rebuild: clean clean-logs build
-
-# Help target
-.PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  make build      - Compile the Java sources"
-	@echo "  make test       - Compile and run unit tests"
-	@echo "  make run        - Compile and run the HTTP server"
-	@echo "  make clean      - Remove compiled files"
-	@echo "  make rebuild    - Clean and rebuild the project"
-	@echo "  make build-test - Compile test sources"
-	@echo "  make clean-logs - Remove log files"
-	@echo "  make help       - Show this help message"
+	@echo "  build   - Compile the Java sources"
+	@echo "  test    - Compile and run unit tests"
+	@echo "  run     - Run the HTTP server"
+	@echo "  clean   - Remove compiled files and logs"
+	@echo "  rebuild - Clean and rebuild the project"

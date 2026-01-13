@@ -96,8 +96,13 @@ public class ClientHandler {
         try {
             handler.handle(currentRequest, responseBuilder);
         } catch (Exception e) {
-            ErrorHandler errorHandler = new ErrorHandler(HttpStatusCode.INTERNAL_SERVER_ERROR, currentConfig);
-            logger.severe(e.getMessage());
+            // TODO: handle exception
+        }
+
+        HttpStatusCode statusCode = responseBuilder.getStatusCode() != null ? responseBuilder.getStatusCode()
+                : HttpStatusCode.INTERNAL_SERVER_ERROR;
+        if (statusCode.isError()) {
+            ErrorHandler errorHandler = new ErrorHandler(statusCode, currentConfig);
             errorHandler.handle(currentRequest, responseBuilder);
         }
 

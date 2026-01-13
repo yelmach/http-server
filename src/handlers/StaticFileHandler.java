@@ -17,8 +17,15 @@ public class StaticFileHandler implements Handler {
     }
 
     @Override
-    public void handle(HttpRequest request, ResponseBuilder response) throws IOException {
-        byte[] content = Files.readAllBytes(file.toPath());
+    public void handle(HttpRequest request, ResponseBuilder response) {
+        byte[] content = new byte[] {};
+
+        try {
+            content = Files.readAllBytes(file.toPath());
+        } catch (IOException e) {
+            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
+        }
+
         String mimeType = MimeTypes.getContentType(file.getName());
 
         response.status(HttpStatusCode.OK)
