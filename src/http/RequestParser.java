@@ -1,5 +1,6 @@
 package http;
 
+import exceptions.InvalidMethodException;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -7,8 +8,6 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-
-import exceptions.InvalidMethodException;
 
 public class RequestParser {
 
@@ -46,7 +45,6 @@ public class RequestParser {
     private String errorMessage;
 
     // Multipart parsing state
-    private boolean isMultipart;
     private String multipartBoundary;
     private MultipartParser multipartParser;
 
@@ -95,7 +93,6 @@ public class RequestParser {
         }
 
         // Reset state
-        isMultipart = false;
         multipartBoundary = null;
         multipartParser = null;
         bodyTempFile = null;
@@ -190,11 +187,10 @@ public class RequestParser {
                         // Check Content-Length if present
                         expectedBodyLength = httpRequest.getHeaders().getContentLength();
                         if (expectedBodyLength > maxBodySize) {
-                            return error("Request body size " + expectedBodyLength +
-                                    " exceeds maximum " + maxBodySize);
+                            return error("Request body size " + expectedBodyLength
+                                    + " exceeds maximum " + maxBodySize);
                         }
 
-                        isMultipart = true;
                         multipartParser = new MultipartParser(multipartBoundary, maxBodySize);
                         currentState = State.PARSING_MULTIPART;
                     } else if (httpRequest.getHeaders().isChunked()) {
@@ -203,8 +199,8 @@ public class RequestParser {
                         expectedBodyLength = httpRequest.getHeaders().getContentLength();
 
                         if (expectedBodyLength > maxBodySize) {
-                            return error("Request body size " + expectedBodyLength +
-                                    " exceeds maximum " + maxBodySize);
+                            return error("Request body size " + expectedBodyLength
+                                    + " exceeds maximum " + maxBodySize);
                         }
 
                         if (expectedBodyLength > STREAM_TO_DISK_THRESHOLD) {
@@ -491,7 +487,19 @@ public class RequestParser {
         }
 
         if (currentHeaderName != null) {
-            httpRequest.getHeaders().add(currentHeaderName, currentHeaderValue.toString());
+            String headerValue = currentHeaderValue.toString();
+            httpRequest.getHeaders().add(currentHeaderName, headerValue);
+
+            // Parse cookies from Cookie header (handle last header)
+            if (currentHeaderName.equalsIgnoreCase("Cookie")) {
+                String[] pairs = headerValue.split(";");
+                for (String pair : pairs) {
+                    String[] keyValue = pair.split("=", 2);
+                    if (keyValue.length == 2) {
+                        httpRequest.addCookie(keyValue[0].trim(), keyValue[1].trim());
+                    }
+                }
+            }
         }
 
         return true;

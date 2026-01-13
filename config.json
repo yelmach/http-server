@@ -47,6 +47,11 @@
           "path": "/upload",
           "methods": ["POST"],
           "root": "./www"
+        },
+        {
+          "path": "/session",
+          "methods": ["GET"],
+          "root": "./www"
         }
       ]
     }

@@ -1,19 +1,16 @@
 package handlers;
 
-import java.io.File;
-
 import config.RouteConfig;
 import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ResponseBuilder;
+import java.io.File;
 
 public class DeleteHandler implements Handler {
 
-    private RouteConfig route;
-    private File resource;
+    private final File resource;
 
     public DeleteHandler(RouteConfig route, File resource) {
-        this.route = route;
         this.resource = resource;
     }
 
@@ -24,7 +21,7 @@ public class DeleteHandler implements Handler {
             return;
         }
 
-        if (resource.isDirectory() || !resource.canWrite() ) {
+        if (resource.isDirectory() || !resource.canWrite()) {
             response.status(HttpStatusCode.FORBIDDEN);
             return;
         }
