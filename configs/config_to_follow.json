@@ -2,7 +2,7 @@
   "servers": [
     {
       "host": "127.0.0.1",
-      "port": 8080,
+      "port": [8080],
       "serverName": "localhost",
       "defaultServer": true,
       "maxBodySize": 1048576,
@@ -30,7 +30,8 @@
         },
         {
           "path": "/old-page",
-          "redirectTo": "/new-page"
+          "redirectTo": "/new-page",
+          "redirectionStatusCode": 301
         },
         {
           "path": "/cgi-bin",

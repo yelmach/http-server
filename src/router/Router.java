@@ -29,8 +29,8 @@ public class Router {
         }
 
         RouteConfig route = matchingRoute.get();
-        
-        //this hardCoded condition just for testing session
+
+        // this hardCoded condition just for testing session
         if (httpRequest.getPath().equals("/session")) {
             return new SessionHandler();
         }

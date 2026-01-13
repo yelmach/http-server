@@ -31,4 +31,8 @@ public enum HttpStatusCode {
     public String getReasonPhrase() {
         return reasonPhrase;
     }
+
+    public boolean isError() {
+        return code >= 400;
+    }
 }

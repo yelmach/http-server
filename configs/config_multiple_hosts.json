@@ -1,6 +1,4 @@
 {
-  "name": "Multi-Host Test Environment",
-  "version": "1.0.0",
   "servers": [
     {
       "comment": "--- SCENARIO 1: Virtual Host A (Primary) on 127.0.0.1:8080 ---",
@@ -9,16 +7,12 @@
       "ports": [8080],
       "defaultServer": true,
       "maxBodySize": 1024,
-      "errorPages": {
-        "404": "./www/error/404.html"
-      },
       "routes": [
         {
           "path": "/",
           "root": "./www/html/primary",
           "methods": ["GET"],
-          "index": "index.html",
-          "directoryListing": true
+          "index": "index.html"
         }
       ]
     },
@@ -27,18 +21,13 @@
       "serverName": "secondary.local",
       "host": "127.0.0.1",
       "ports": [8080],
-      "defaultServer": false,
       "maxBodySize": 1024,
-      "errorPages": {
-        "404": "./www/error/404.html"
-      },
       "routes": [
         {
           "path": "/",
           "root": "./www/html/secondary",
           "methods": ["GET"],
-          "index": "index.html",
-          "directoryListing": false
+          "index": "index.html"
         }
       ]
     },
@@ -47,17 +36,12 @@
       "serverName": "ip2.local",
       "host": "127.0.0.2",
       "ports": [8080],
-      "defaultServer": false,
       "maxBodySize": 1024,
-      "errorPages": {
-        "404": "./www/error/404.html"
-      },
       "routes": [
         {
           "path": "/",
-          "root": "./www/html/ip2",
+          "root": "./www/html",
           "methods": ["GET"],
-          "index": "index.html",
           "directoryListing": true
         }
       ]
@@ -69,15 +53,11 @@
       "ports": [9090],
       "defaultServer": false,
       "maxBodySize": 1024,
-      "errorPages": {
-        "404": "./www/error/404.html"
-      },
       "routes": [
         {
           "path": "/",
           "root": "./www/html/9090",
           "methods": ["GET"],
-          "index": "index.html",
           "directoryListing": true
         }
       ]

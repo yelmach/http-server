@@ -5,7 +5,6 @@ import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ResponseBuilder;
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 
 public class DirectoryHandler implements Handler {
@@ -17,11 +16,12 @@ public class DirectoryHandler implements Handler {
     }
 
     @Override
-    public void handle(HttpRequest request, ResponseBuilder response) throws IOException {
+    public void handle(HttpRequest request, ResponseBuilder response) {
         File[] files = resource.listFiles();
 
         if (files == null) {
-            throw new IOException("Unable to read directory: " + resource.getAbsolutePath());
+            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
+            return;
         }
         Arrays.sort(files, (a, b) -> {
             if (a.isDirectory() && !b.isDirectory()) {
