@@ -66,6 +66,10 @@ public class HttpRequest {
         return body != null ? new String(body, StandardCharsets.UTF_8) : null;
     }
 
+    public String getContentLength() {
+        return body != null ? String.valueOf(body.length) : "unknown";
+    }
+
     public void setBody(byte[] body) {
         this.body = body;
     }
