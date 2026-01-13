@@ -1,13 +1,13 @@
 package core;
 
+import config.ServerConfig;
+import handlers.ErrorHandler;
+import handlers.Handler;
 import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ParsingResult;
 import http.RequestParser;
 import http.ResponseBuilder;
-import router.Router;
-import utils.ServerLogger;
-
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -17,10 +17,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.logging.Logger;
-
-import config.ServerConfig;
-import handlers.ErrorHandler;
-import handlers.Handler;
+import router.Router;
+import utils.ServerLogger;
 
 public class ClientHandler {
 
@@ -99,6 +97,7 @@ public class ClientHandler {
             handler.handle(currentRequest, responseBuilder);
         } catch (Exception e) {
             ErrorHandler errorHandler = new ErrorHandler(HttpStatusCode.INTERNAL_SERVER_ERROR, currentConfig);
+            logger.severe(e.getMessage());
             errorHandler.handle(currentRequest, responseBuilder);
         }
 
