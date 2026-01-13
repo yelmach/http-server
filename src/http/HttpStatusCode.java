@@ -7,6 +7,7 @@ public enum HttpStatusCode {
     FORBIDDEN(403, "Forbidden"),
     NOT_FOUND(404, "Not Found"),
     METHOD_NOT_ALLOWED(405, "Method Not Allowed"),
+    REQUEST_TIMEOUT(408 ,"Request Timeout"),
     PAYLOAD_TOO_LARGE(413, "Payload Too Large"),
     URI_TOO_LONG(414, "URI Too Long"),
     HEADER_FIELDS_TOO_LARGE(431, "Request Header Fields Too Large"),
@@ -35,4 +36,14 @@ public enum HttpStatusCode {
     public boolean isError() {
         return code >= 400;
     }
+
+    public static HttpStatusCode fromCode(int code) {
+        for (HttpStatusCode status : values()) {
+            if (status.code == code) {
+                return status;
+            }
+        }
+        throw new IllegalArgumentException("Unknown HTTP status code: " + code);
+    }
+
 }
