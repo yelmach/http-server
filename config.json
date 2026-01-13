@@ -34,6 +34,12 @@
           "cgiExtension": "py"
         },
         {
+          "path": "/cgi-3",
+          "root": "./www/scripts/cgi-3.py",
+          "methods": ["GET", "POST"],
+          "cgiExtension": "py"
+        },
+        {
           "path": "/old-page",
           "redirectTo": "/",
           "redirectStatusCode": 301
