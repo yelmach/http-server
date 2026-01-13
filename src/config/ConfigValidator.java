@@ -12,6 +12,7 @@ import utils.ServerLogger;
 public class ConfigValidator {
 
     private final static Logger logger = ServerLogger.get();
+    private static Set<String> allowed = Set.of("GET", "POST", "DELETE");
 
     public static boolean validateGeneralFields(Map<String, Object> json) {
         if (json.get("name") == null || !(json.get("name") instanceof String)) {
@@ -59,9 +60,7 @@ public class ConfigValidator {
 
             String hostStr = (String) host;
             try {
-                InetAddress address = InetAddress.getByAddress(
-                        InetAddress.getByName(hostStr).getAddress()
-                );
+                InetAddress.getByName(hostStr);
             } catch (UnknownHostException e) {
                 logger.severe("Invalid IP address: " + hostStr);
                 return false;
@@ -141,6 +140,12 @@ public class ConfigValidator {
 
                     boolean isRedirect = route.get("redirectTo") != null;
                     if (isRedirect) {
+                        Object code = route.get("redirectStatusCode");
+                        if (!(code instanceof Integer)
+                                || (((Integer) code) != 301 && ((Integer) code) != 302)) {
+                            logger.severe("Invalid redirectStatusCode for path: " + path);
+                            return false;
+                        }
                         continue;
                     }
 
@@ -150,6 +155,27 @@ public class ConfigValidator {
                     }
                     if (route.get("methods") == null || !(route.get("methods") instanceof java.util.List)) {
                         logger.severe("Invalid or missing 'methods' field in route.");
+                        return false;
+                    }
+
+                    List methodsList = (List) route.get("methods");
+
+                    for (Object m : methodsList) {
+                        if (!(m instanceof String) || !allowed.contains(m)) {
+                            logger.severe("Invalid HTTP method: " + m);
+                            return false;
+                        }
+                    }
+
+                    Object dl = route.get("directoryListing");
+                    if (dl != null && !(dl instanceof Boolean)) {
+                        logger.severe("Invalid directoryListing flag");
+                        return false;
+                    }
+
+                    Object index = route.get("index");
+                    if (index != null && !(index instanceof String)) {
+                        logger.severe("Invalid index field");
                         return false;
                     }
 
