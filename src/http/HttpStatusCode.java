@@ -2,6 +2,7 @@ package http;
 
 public enum HttpStatusCode {
     OK(200, "OK"),
+    CREATED(201, "Created"),
     BAD_REQUEST(400, "Bad Request"),
     FORBIDDEN(403, "Forbidden"),
     NOT_FOUND(404, "Not Found"),
@@ -12,7 +13,8 @@ public enum HttpStatusCode {
     INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
     NOT_IMPLEMENTED(501, "Not Implemented"),
     MOVED_PERMANENTLY(301, "Moved Permanently"),
-    FOUND(302, "Found");
+    FOUND(302, "Found"),
+    NO_CONTENT(204, "No Content");
 
     private final int code;
     private final String reasonPhrase;
@@ -28,5 +30,9 @@ public enum HttpStatusCode {
 
     public String getReasonPhrase() {
         return reasonPhrase;
+    }
+
+    public boolean isError() {
+        return code >= 400;
     }
 }

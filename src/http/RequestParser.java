@@ -1,11 +1,13 @@
 package http;
 
+import exceptions.InvalidMethodException;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-
-import exceptions.InvalidMethodException;
 
 public class RequestParser {
 
@@ -16,6 +18,7 @@ public class RequestParser {
         PARSING_CHUNK_SIZE,
         PARSING_CHUNK_DATA,
         PARSING_CHUNK_TRAILER,
+        PARSING_MULTIPART,
         COMPLETE,
         ERROR
     }
@@ -24,6 +27,7 @@ public class RequestParser {
     private static final int MAX_HEADER_SIZE = 16 * 1024;
     private static final int MAX_URI_LENGTH = 4 * 1024;
     private static final int MAX_EMPTY_LINES = 10;
+    private static final int STREAM_TO_DISK_THRESHOLD = 5 * 1024 * 1024;
     private final int maxBodySize;
 
     private State currentState;
@@ -39,6 +43,15 @@ public class RequestParser {
 
     private int emptyLinesSkipped;
     private String errorMessage;
+
+    // Multipart parsing state
+    private String multipartBoundary;
+    private MultipartParser multipartParser;
+
+    // Raw binary streaming state
+    private File bodyTempFile;
+    private FileOutputStream bodyOutputStream;
+    private boolean streamingBodyToDisk;
 
     public RequestParser(int maxBodySize) {
         this.maxBodySize = maxBodySize;
@@ -61,6 +74,30 @@ public class RequestParser {
         emptyLinesSkipped = 0;
         errorMessage = null;
         bodyStream = null;
+
+        // Cleanup multipart parser
+        if (multipartParser != null) {
+            multipartParser.cleanup();
+        }
+
+        // Cleanup raw binary temp file
+        try {
+            if (bodyOutputStream != null) {
+                bodyOutputStream.close();
+            }
+        } catch (IOException e) {
+            // Ignore
+        }
+        if (bodyTempFile != null && bodyTempFile.exists()) {
+            bodyTempFile.delete();
+        }
+
+        // Reset state
+        multipartBoundary = null;
+        multipartParser = null;
+        bodyTempFile = null;
+        bodyOutputStream = null;
+        streamingBodyToDisk = false;
     }
 
     public void reset() {
@@ -139,14 +176,44 @@ public class RequestParser {
                         return error("Header validation failed: " + error);
                     }
 
-                    if (httpRequest.getHeaders().isChunked()) {
+                    // Check for multipart/form-data
+                    String contentType = httpRequest.getHeaders().get("Content-Type");
+                    if (contentType != null && contentType.startsWith("multipart/form-data")) {
+                        multipartBoundary = extractBoundary(contentType);
+                        if (multipartBoundary == null) {
+                            return error("Missing boundary in multipart Content-Type");
+                        }
+
+                        // Check Content-Length if present
+                        expectedBodyLength = httpRequest.getHeaders().getContentLength();
+                        if (expectedBodyLength > maxBodySize) {
+                            return error("Request body size " + expectedBodyLength
+                                    + " exceeds maximum " + maxBodySize);
+                        }
+
+                        multipartParser = new MultipartParser(multipartBoundary, maxBodySize);
+                        currentState = State.PARSING_MULTIPART;
+                    } else if (httpRequest.getHeaders().isChunked()) {
                         currentState = State.PARSING_CHUNK_SIZE;
                     } else {
                         expectedBodyLength = httpRequest.getHeaders().getContentLength();
 
                         if (expectedBodyLength > maxBodySize) {
-                            return error("Request body size " + expectedBodyLength +
-                                    " exceeds maximum " + maxBodySize);
+                            return error("Request body size " + expectedBodyLength
+                                    + " exceeds maximum " + maxBodySize);
+                        }
+
+                        if (expectedBodyLength > STREAM_TO_DISK_THRESHOLD) {
+                            // Stream large bodies to disk
+                            try {
+                                bodyTempFile = File.createTempFile("http-body-", ".tmp");
+                                bodyTempFile.deleteOnExit();
+                                bodyOutputStream = new FileOutputStream(bodyTempFile);
+                                streamingBodyToDisk = true;
+                                httpRequest.setBodyTempFile(bodyTempFile);
+                            } catch (IOException e) {
+                                return error("Failed to create temp file for large body: " + e.getMessage());
+                            }
                         }
 
                         if (expectedBodyLength > 0) {
@@ -165,16 +232,30 @@ public class RequestParser {
                     int bytesToRead = Math.min(remaining, availableBytes);
 
                     if (bytesToRead > 0) {
-                        if (httpRequest.getBody() == null) {
-                            httpRequest.setBody(new byte[expectedBodyLength]);
+                        if (streamingBodyToDisk) {
+                            try {
+                                bodyOutputStream.write(data, position, bytesToRead);
+                            } catch (IOException e) {
+                                return error("Failed to write to temp file: " + e.getMessage());
+                            }
+                        } else {
+                            if (httpRequest.getBody() == null) {
+                                httpRequest.setBody(new byte[expectedBodyLength]);
+                            }
+                            System.arraycopy(data, position, httpRequest.getBody(), bodyBytesRead, bytesToRead);
                         }
-
-                        System.arraycopy(data, position, httpRequest.getBody(), bodyBytesRead, bytesToRead);
                         bodyBytesRead += bytesToRead;
                         position += bytesToRead;
                     }
 
                     if (bodyBytesRead >= expectedBodyLength) {
+                        if (streamingBodyToDisk) {
+                            try {
+                                bodyOutputStream.close();
+                            } catch (IOException e) {
+                                return error("Failed to close temp file: " + e.getMessage());
+                            }
+                        }
                         currentState = State.COMPLETE;
                         removeProcessedData(data, position);
                         return ParsingResult.complete(httpRequest);
@@ -273,6 +354,13 @@ public class RequestParser {
                     currentState = State.COMPLETE;
                     removeProcessedData(data, position);
                     return ParsingResult.complete(httpRequest);
+
+                case PARSING_MULTIPART:
+                    ParsingResult multipartResult = multipartParser.parse(data, position, httpRequest);
+                    if (multipartResult.getProcessedPosition() >= 0) {
+                        removeProcessedData(data, multipartResult.getProcessedPosition());
+                    }
+                    return multipartResult;
 
                 default:
                     return error("Invalid parser state: " + currentState);
@@ -399,7 +487,19 @@ public class RequestParser {
         }
 
         if (currentHeaderName != null) {
-            httpRequest.getHeaders().add(currentHeaderName, currentHeaderValue.toString());
+            String headerValue = currentHeaderValue.toString();
+            httpRequest.getHeaders().add(currentHeaderName, headerValue);
+
+            // Parse cookies from Cookie header (handle last header)
+            if (currentHeaderName.equalsIgnoreCase("Cookie")) {
+                String[] pairs = headerValue.split(";");
+                for (String pair : pairs) {
+                    String[] keyValue = pair.split("=", 2);
+                    if (keyValue.length == 2) {
+                        httpRequest.addCookie(keyValue[0].trim(), keyValue[1].trim());
+                    }
+                }
+            }
         }
 
         return true;
@@ -438,4 +538,24 @@ public class RequestParser {
         this.currentState = State.ERROR;
         return ParsingResult.error(message);
     }
+
+    private String extractBoundary(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+
+        String[] parts = contentType.split(";");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.startsWith("boundary=")) {
+                String boundary = part.substring("boundary=".length());
+                if (boundary.startsWith("\"") && boundary.endsWith("\"")) {
+                    boundary = boundary.substring(1, boundary.length() - 1);
+                }
+                return boundary;
+            }
+        }
+        return null;
+    }
+
 }

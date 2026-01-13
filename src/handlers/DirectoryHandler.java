@@ -1,36 +1,35 @@
 package handlers;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-
 import config.RouteConfig;
 import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ResponseBuilder;
+import java.io.File;
+import java.util.Arrays;
 
 public class DirectoryHandler implements Handler {
 
-    private RouteConfig route;
-    private File resource;
+    private final File resource;
 
     public DirectoryHandler(RouteConfig route, File resource) {
-        this.route = route;
         this.resource = resource;
     }
 
     @Override
-    public void handle(HttpRequest request, ResponseBuilder response) throws IOException {
+    public void handle(HttpRequest request, ResponseBuilder response) {
         File[] files = resource.listFiles();
 
         if (files == null) {
-            throw new IOException("Unable to read directory: " + resource.getAbsolutePath());
+            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
+            return;
         }
         Arrays.sort(files, (a, b) -> {
-            if (a.isDirectory() && !b.isDirectory())
+            if (a.isDirectory() && !b.isDirectory()) {
                 return -1;
-            if (!a.isDirectory() && b.isDirectory())
+            }
+            if (!a.isDirectory() && b.isDirectory()) {
                 return 1;
+            }
             return a.getName().compareToIgnoreCase(b.getName());
         });
 
@@ -70,8 +69,9 @@ public class DirectoryHandler implements Handler {
         for (File file : files) {
             String name = file.getName();
             String href = request.getPath();
-            if (!href.endsWith("/"))
+            if (!href.endsWith("/")) {
                 href += "/";
+            }
             href += name;
 
             html.append("<li class='file-item'>");

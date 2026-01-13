@@ -1,14 +1,22 @@
 package http;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class HttpRequest {
+
     private HttpMethod method;
     private String path;
     private String httpVersion;
     private HttpHeaders headers;
     private byte[] body;
     private String queryString;
+    private List<MultipartPart> multipartParts;
+    private File bodyTempFile;
+    private final Map<String, String> cookies = new HashMap<>();
 
     public HttpRequest() {
         this.headers = new HttpHeaders();
@@ -58,6 +66,10 @@ public class HttpRequest {
         return body != null ? new String(body, StandardCharsets.UTF_8) : null;
     }
 
+    public String getContentLength() {
+        return body != null ? String.valueOf(body.length) : "unknown";
+    }
+
     public void setBody(byte[] body) {
         this.body = body;
     }
@@ -78,5 +90,29 @@ public class HttpRequest {
         } else {
             return connection != null && connection.equals("keep-alive");
         }
+    }
+
+    public List<MultipartPart> getMultipartParts() {
+        return multipartParts;
+    }
+
+    public void setMultipartParts(List<MultipartPart> multipartParts) {
+        this.multipartParts = multipartParts;
+    }
+
+    public File getBodyTempFile() {
+        return bodyTempFile;
+    }
+
+    public void setBodyTempFile(File bodyTempFile) {
+        this.bodyTempFile = bodyTempFile;
+    }
+
+    public void addCookie(String name, String value) {
+        cookies.put(name, value);
+    }
+
+    public String getCookie(String name) {
+        return cookies.get(name);
     }
 }

@@ -1,13 +1,13 @@
 package core;
 
+import config.ServerConfig;
+import handlers.ErrorHandler;
+import handlers.Handler;
 import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ParsingResult;
 import http.RequestParser;
 import http.ResponseBuilder;
-import router.Router;
-import utils.ServerLogger;
-
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -17,10 +17,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.logging.Logger;
-
-import config.ServerConfig;
-import handlers.ErrorHandler;
-import handlers.Handler;
+import router.Router;
+import utils.ServerLogger;
 
 public class ClientHandler {
 
@@ -40,7 +38,14 @@ public class ClientHandler {
         this.client = clientChannel;
         this.selectionKey = selectionKey;
         this.readBuffer = ByteBuffer.allocate(8192);
-        this.parser = new RequestParser();
+
+        int maxBodySize = 10 * 1024 * 1024; // default 10MB
+        for (ServerConfig config : virtualHosts) {
+            if (config.getMaxBodySize() > maxBodySize) {
+                maxBodySize = config.getMaxBodySize();
+            }
+        }
+        this.parser = new RequestParser(maxBodySize);
         this.lastActivityTime = System.currentTimeMillis();
         this.virtualHosts = virtualHosts;
     }
@@ -91,19 +96,17 @@ public class ClientHandler {
         try {
             handler.handle(currentRequest, responseBuilder);
         } catch (Exception e) {
-            ErrorHandler errorHandler = new ErrorHandler(HttpStatusCode.INTERNAL_SERVER_ERROR, currentConfig);
+            // TODO: handle exception
+        }
+
+        HttpStatusCode statusCode = responseBuilder.getStatusCode() != null ? responseBuilder.getStatusCode()
+                : HttpStatusCode.INTERNAL_SERVER_ERROR;
+        if (statusCode.isError()) {
+            ErrorHandler errorHandler = new ErrorHandler(statusCode, currentConfig);
             errorHandler.handle(currentRequest, responseBuilder);
         }
 
         keepAlive = currentRequest.shouldKeepAlive();
-
-        // ByteBuffer response = responseBuilder.status(HttpStatusCode.OK)
-        // .keepAlive(keepAlive)
-        // .contentType("text/plain")
-        // .body(currentConfig.getHost() + ":" + currentConfig.getPorts() + "
-        // hostheader: "
-        // + currentConfig.getServerName())
-        // .buildResponse();
 
         responseQueue.add(responseBuilder.buildResponse());
         logger.info("handle request for " + currentConfig.getServerName() + ": " + currentRequest.getMethod() + " "

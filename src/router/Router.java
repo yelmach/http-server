@@ -8,6 +8,7 @@ import handlers.DirectoryHandler;
 import handlers.ErrorHandler;
 import handlers.Handler;
 import handlers.RedirectHandler;
+import handlers.SessionHandler;
 import handlers.StaticFileHandler;
 import handlers.UploadHandler;
 import http.HttpRequest;
@@ -28,6 +29,11 @@ public class Router {
         }
 
         RouteConfig route = matchingRoute.get();
+
+        // this hardCoded condition just for testing session
+        if (httpRequest.getPath().equals("/session")) {
+            return new SessionHandler();
+        }
 
         // 2. Handle Redirection (301/302)
         if (route.getRedirectTo() != null) {
