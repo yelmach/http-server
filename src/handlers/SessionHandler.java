@@ -13,7 +13,7 @@ public class SessionHandler implements Handler {
     @Override
     public void handle(HttpRequest request, ResponseBuilder response) {
         SessionManager sm = SessionManager.getInstance();
-        String sessionId = request.getCookie("JSESSIONID");
+        String sessionId = request.getCookie("SESSIONID");
 
         String body;
 
@@ -34,7 +34,7 @@ public class SessionHandler implements Handler {
             response.status(HttpStatusCode.OK).body(body.getBytes(StandardCharsets.UTF_8));
 
             // 3. Set the cookie
-            response.header("Set-Cookie", new Cookie("JSESSIONID", sessionId).toString());
+            response.header("Set-Cookie", new Cookie("SESSIONID", sessionId).toString());
         }
 
         response.header("Content-Type", "text/html");
