@@ -33,7 +33,12 @@ public class RequestParser {
     private State currentState;
     private HttpRequest httpRequest;
     private ByteArrayOutputStream accumulationBuffer;
+
+    // Standard Body Buffers
     private ByteArrayOutputStream bodyStream;
+    private File bodyTempFile;
+    private FileOutputStream bodyOutputStream;
+    private boolean streamingBodyToDisk;
 
     private int bodyBytesRead;
     private int expectedBodyLength;
@@ -47,16 +52,11 @@ public class RequestParser {
     // Multipart parsing state
     private String multipartBoundary;
     private MultipartParser multipartParser;
-
-    // Raw binary streaming state
-    private File bodyTempFile;
-    private FileOutputStream bodyOutputStream;
-    private boolean streamingBodyToDisk;
+    private boolean isChunkedMultipart; // Flag to track mixed mode
 
     public RequestParser(int maxBodySize) {
         this.maxBodySize = maxBodySize;
         this.accumulationBuffer = new ByteArrayOutputStream();
-
         reset();
     }
 
@@ -75,29 +75,28 @@ public class RequestParser {
         errorMessage = null;
         bodyStream = null;
 
-        // Cleanup multipart parser
         if (multipartParser != null) {
             multipartParser.cleanup();
         }
 
-        // Cleanup raw binary temp file
         try {
-            if (bodyOutputStream != null) {
+            if (bodyOutputStream != null)
                 bodyOutputStream.close();
-            }
         } catch (IOException e) {
             // Ignore
         }
-        if (bodyTempFile != null && bodyTempFile.exists()) {
+
+        // Clean up temp file only if we are resetting due to error/timeout
+        if (currentState == State.ERROR && bodyTempFile != null && bodyTempFile.exists()) {
             bodyTempFile.delete();
         }
 
-        // Reset state
         multipartBoundary = null;
         multipartParser = null;
         bodyTempFile = null;
         bodyOutputStream = null;
         streamingBodyToDisk = false;
+        isChunkedMultipart = false;
     }
 
     public void reset() {
@@ -124,101 +123,80 @@ public class RequestParser {
         while (position < data.length) {
             switch (currentState) {
                 case PARSING_REQUEST_LINE:
-                    // empty line skipped
                     while (position + 1 < data.length && data[position] == '\r' && data[position + 1] == '\n') {
                         emptyLinesSkipped++;
-                        if (emptyLinesSkipped > MAX_EMPTY_LINES) {
-                            return error("Too many empty lines before request line (max " + MAX_EMPTY_LINES + ")");
-                        }
+                        if (emptyLinesSkipped > MAX_EMPTY_LINES)
+                            return error("Too many empty lines");
                         position += 2;
                     }
-
                     int endLinePos = findLineEnd(data, position);
                     if (endLinePos == -1) {
-                        if (data.length >= MAX_REQUEST_LINE_LENGTH) {
-                            errorMessage = "Request line exceeds maximum length of " + MAX_REQUEST_LINE_LENGTH;
-                            return error(errorMessage);
-                        }
+                        if (data.length >= MAX_REQUEST_LINE_LENGTH)
+                            return error("Request line too long");
                         return ParsingResult.needMoreData();
                     }
-
                     String requestLine = new String(data, position, endLinePos - position, StandardCharsets.UTF_8);
-
-                    if (!parseRequestLine(requestLine)) {
-                        currentState = State.ERROR;
+                    if (!parseRequestLine(requestLine))
                         return ParsingResult.error(errorMessage);
-                    }
-
-                    position = endLinePos + 2; // Skip \r\n
+                    position = endLinePos + 2;
                     currentState = State.PARSING_HEADERS;
                     break;
 
                 case PARSING_HEADERS:
                     int headersEnd = findHeadersEnd(data, position);
                     if (headersEnd == -1) {
-                        if (data.length - position > MAX_HEADER_SIZE) {
-                            return error("Headers exceed maximum size of " + MAX_HEADER_SIZE);
-                        }
-
+                        if (data.length - position > MAX_HEADER_SIZE)
+                            return error("Headers too large");
                         removeProcessedData(data, position);
                         return ParsingResult.needMoreData();
                     }
-
-                    if (!parseHeaders(data, position, headersEnd)) {
-                        currentState = State.ERROR;
+                    if (!parseHeaders(data, position, headersEnd))
                         return ParsingResult.error(errorMessage);
-                    }
+                    position = headersEnd + 4;
 
-                    position = headersEnd + 4; // Skip \r\n\r\n
+                    if (httpRequest.getHeaders().validate() != null)
+                        return error(httpRequest.getHeaders().validate());
 
-                    String error = httpRequest.getHeaders().validate();
-                    if (error != null) {
-                        return error("Header validation failed: " + error);
-                    }
-
-                    // Check for multipart/form-data
                     String contentType = httpRequest.getHeaders().get("Content-Type");
-                    if (contentType != null && contentType.startsWith("multipart/form-data")) {
+                    boolean isMultipart = contentType != null && contentType.startsWith("multipart/form-data");
+                    boolean isChunked = httpRequest.getHeaders().isChunked();
+
+                    if (isMultipart) {
                         multipartBoundary = extractBoundary(contentType);
-                        if (multipartBoundary == null) {
-                            return error("Missing boundary in multipart Content-Type");
-                        }
-
-                        // Check Content-Length if present
-                        expectedBodyLength = httpRequest.getHeaders().getContentLength();
-                        if (expectedBodyLength > maxBodySize) {
-                            return error("Request body size " + expectedBodyLength
-                                    + " exceeds maximum " + maxBodySize);
-                        }
-
+                        if (multipartBoundary == null)
+                            return error("Missing multipart boundary");
                         multipartParser = new MultipartParser(multipartBoundary, maxBodySize);
-                        currentState = State.PARSING_MULTIPART;
-                    } else if (httpRequest.getHeaders().isChunked()) {
-                        currentState = State.PARSING_CHUNK_SIZE;
-                    } else {
-                        expectedBodyLength = httpRequest.getHeaders().getContentLength();
+                    }
 
-                        if (expectedBodyLength > maxBodySize) {
-                            return error("Request body size " + expectedBodyLength
-                                    + " exceeds maximum " + maxBodySize);
+                    if (isChunked) {
+                        // Priority 1: Chunked Encoding (Transport Layer)
+                        currentState = State.PARSING_CHUNK_SIZE;
+                        if (isMultipart) {
+                            isChunkedMultipart = true; // Flag to pipe data later
                         }
+                    } else if (isMultipart) {
+                        // Priority 2: Standard Multipart (Identity Encoding)
+                        expectedBodyLength = httpRequest.getHeaders().getContentLength();
+                        if (expectedBodyLength > maxBodySize)
+                            return error("Body too large");
+                        currentState = State.PARSING_MULTIPART;
+                    } else {
+                        // Priority 3: Standard Fixed Length
+                        expectedBodyLength = httpRequest.getHeaders().getContentLength();
+                        if (expectedBodyLength > maxBodySize)
+                            return error("Body too large");
 
                         if (expectedBodyLength > STREAM_TO_DISK_THRESHOLD) {
-                            // Stream large bodies to disk
                             try {
-                                bodyTempFile = File.createTempFile("http-body-", ".tmp");
-                                bodyTempFile.deleteOnExit();
-                                bodyOutputStream = new FileOutputStream(bodyTempFile);
-                                streamingBodyToDisk = true;
-                                httpRequest.setBodyTempFile(bodyTempFile);
+                                switchToDiskMode();
                             } catch (IOException e) {
-                                return error("Failed to create temp file for large body: " + e.getMessage());
+                                return error(e.getMessage());
                             }
                         }
 
-                        if (expectedBodyLength > 0) {
+                        if (expectedBodyLength > 0)
                             currentState = State.PARSING_BODY_FIXED_LENGTH;
-                        } else {
+                        else {
                             currentState = State.COMPLETE;
                             removeProcessedData(data, position);
                             return ParsingResult.complete(httpRequest);
@@ -228,34 +206,30 @@ public class RequestParser {
 
                 case PARSING_BODY_FIXED_LENGTH:
                     int remaining = expectedBodyLength - bodyBytesRead;
-                    int availableBytes = data.length - position;
-                    int bytesToRead = Math.min(remaining, availableBytes);
+                    int toRead = Math.min(remaining, data.length - position);
 
-                    if (bytesToRead > 0) {
+                    if (toRead > 0) {
                         if (streamingBodyToDisk) {
                             try {
-                                bodyOutputStream.write(data, position, bytesToRead);
+                                bodyOutputStream.write(data, position, toRead);
                             } catch (IOException e) {
-                                return error("Failed to write to temp file: " + e.getMessage());
+                                return error("Disk write failed");
                             }
                         } else {
-                            if (httpRequest.getBody() == null) {
+                            if (httpRequest.getBody() == null)
                                 httpRequest.setBody(new byte[expectedBodyLength]);
-                            }
-                            System.arraycopy(data, position, httpRequest.getBody(), bodyBytesRead, bytesToRead);
+                            System.arraycopy(data, position, httpRequest.getBody(), bodyBytesRead, toRead);
                         }
-                        bodyBytesRead += bytesToRead;
-                        position += bytesToRead;
+                        bodyBytesRead += toRead;
+                        position += toRead;
                     }
 
                     if (bodyBytesRead >= expectedBodyLength) {
-                        if (streamingBodyToDisk) {
+                        if (streamingBodyToDisk)
                             try {
                                 bodyOutputStream.close();
                             } catch (IOException e) {
-                                return error("Failed to close temp file: " + e.getMessage());
                             }
-                        }
                         currentState = State.COMPLETE;
                         removeProcessedData(data, position);
                         return ParsingResult.complete(httpRequest);
@@ -265,58 +239,81 @@ public class RequestParser {
                     }
 
                 case PARSING_CHUNK_SIZE:
-                    int chunkSizeLineEnd = findLineEnd(data, position);
-                    if (chunkSizeLineEnd == -1) {
+                    int chunkLineEnd = findLineEnd(data, position);
+                    if (chunkLineEnd == -1) {
                         removeProcessedData(data, position);
                         return ParsingResult.needMoreData();
                     }
 
-                    String chunkSizeLine = new String(data, position, chunkSizeLineEnd - position,
-                            StandardCharsets.UTF_8).trim();
-
+                    String line = new String(data, position, chunkLineEnd - position, StandardCharsets.UTF_8).trim();
                     try {
-                        int semicolonIndex = chunkSizeLine.indexOf(';');
-                        if (semicolonIndex != -1) {
-                            chunkSizeLine = chunkSizeLine.substring(0, semicolonIndex);
-                        }
-
-                        currentChunkSize = Integer.parseInt(chunkSizeLine.trim(), 16);
-
-                        if (currentChunkSize < 0) {
-                            return error("Invalid chunk size: " + currentChunkSize);
-                        }
+                        int semi = line.indexOf(';');
+                        if (semi != -1)
+                            line = line.substring(0, semi);
+                        currentChunkSize = Integer.parseInt(line.trim(), 16);
                     } catch (NumberFormatException e) {
-                        return error("Invalid chunk size format: " + chunkSizeLine);
+                        return error("Invalid chunk size");
                     }
+                    position = chunkLineEnd + 2;
 
-                    position = chunkSizeLineEnd + 2;
-
-                    if (currentChunkSize == 0) {
+                    if (currentChunkSize == 0)
                         currentState = State.PARSING_CHUNK_TRAILER;
-                    } else {
+                    else {
                         currentState = State.PARSING_CHUNK_DATA;
                         currentChunkBytesRead = 0;
                     }
                     break;
 
                 case PARSING_CHUNK_DATA:
-                    int remainingChunkBytes = currentChunkSize - currentChunkBytesRead;
-                    int availableChunkBytes = data.length - position;
-                    int chunkBytesToRead = Math.min(remainingChunkBytes, availableChunkBytes);
+                    int chunkLeft = currentChunkSize - currentChunkBytesRead;
+                    int chunkRead = Math.min(chunkLeft, data.length - position);
 
-                    if (chunkBytesToRead > 0) {
-                        if (bodyStream == null) {
-                            bodyStream = new ByteArrayOutputStream();
+                    if (chunkRead > 0) {
+                        if (bodyBytesRead + chunkRead > maxBodySize)
+                            return error("Chunked body too large");
+
+                        // Branch A: Chunked Multipart (Pipe decoded bytes to MultipartParser)
+                        if (isChunkedMultipart) {
+                            // We must copy data because parse() expects a buffer it can read from
+                            byte[] chunkData = new byte[chunkRead];
+                            System.arraycopy(data, position, chunkData, 0, chunkRead);
+
+                            // Feed to Multipart Parser
+                            ParsingResult mpResult = multipartParser.parse(chunkData, 0, httpRequest);
+                            if (mpResult.isError())
+                                return mpResult;
+                            // Note: Multipart might not be complete yet, we just feed it chunks
                         }
-                        bodyStream.write(data, position, chunkBytesToRead);
+                        // Branch B: Standard Chunked (Buffer to RAM/Disk)
+                        else {
+                            if (!streamingBodyToDisk && (bodyBytesRead + chunkRead > STREAM_TO_DISK_THRESHOLD)) {
+                                try {
+                                    switchToDiskMode();
+                                    if (bodyStream != null) {
+                                        bodyOutputStream.write(bodyStream.toByteArray());
+                                        bodyStream = null;
+                                    }
+                                } catch (IOException e) {
+                                    return error("Disk switch failed");
+                                }
+                            }
 
-                        currentChunkBytesRead += chunkBytesToRead;
-                        bodyBytesRead += chunkBytesToRead;
-                        position += chunkBytesToRead;
-
-                        if (bodyBytesRead > maxBodySize) {
-                            return error("Chunked body size exceeds maximum " + maxBodySize);
+                            if (streamingBodyToDisk) {
+                                try {
+                                    bodyOutputStream.write(data, position, chunkRead);
+                                } catch (IOException e) {
+                                    return error("Disk write failed");
+                                }
+                            } else {
+                                if (bodyStream == null)
+                                    bodyStream = new ByteArrayOutputStream();
+                                bodyStream.write(data, position, chunkRead);
+                            }
                         }
+
+                        currentChunkBytesRead += chunkRead;
+                        bodyBytesRead += chunkRead;
+                        position += chunkRead;
                     }
 
                     if (currentChunkBytesRead >= currentChunkSize) {
@@ -324,11 +321,8 @@ public class RequestParser {
                             removeProcessedData(data, position);
                             return ParsingResult.needMoreData();
                         }
-
-                        if (data[position] != '\r' || data[position + 1] != '\n') {
-                            return error("Expected CRLF after chunk data");
-                        }
-
+                        if (data[position] != '\r' || data[position + 1] != '\n')
+                            return error("Expected CRLF");
                         position += 2;
                         currentState = State.PARSING_CHUNK_SIZE;
                     } else {
@@ -342,13 +336,23 @@ public class RequestParser {
                         removeProcessedData(data, position);
                         return ParsingResult.needMoreData();
                     }
+                    if (data[position] != '\r' || data[position + 1] != '\n')
+                        return error("Expected CRLF");
 
-                    if (data[position] != '\r' || data[position + 1] != '\n') {
-                        return error("Expected CRLF after final chunk");
-                    }
-
-                    if (bodyBytesRead > 0) {
+                    // Finalize Body based on Mode
+                    if (isChunkedMultipart) {
+                        // Multipart parser should have populated httpRequest.multipartParts already
+                        // We assume it finished when it saw the end boundary inside the chunks.
+                    } else if (streamingBodyToDisk) {
+                        try {
+                            bodyOutputStream.close();
+                        } catch (IOException e) {
+                        }
+                        httpRequest.setBodyTempFile(bodyTempFile);
+                    } else if (bodyStream != null) {
                         httpRequest.setBody(bodyStream.toByteArray());
+                    } else {
+                        httpRequest.setBody(new byte[0]);
                     }
 
                     currentState = State.COMPLETE;
@@ -356,33 +360,40 @@ public class RequestParser {
                     return ParsingResult.complete(httpRequest);
 
                 case PARSING_MULTIPART:
-                    ParsingResult multipartResult = multipartParser.parse(data, position, httpRequest);
-                    if (multipartResult.getProcessedPosition() >= 0) {
-                        removeProcessedData(data, multipartResult.getProcessedPosition());
-                    }
-                    return multipartResult;
+                    // Standard Identity Multipart (Not Chunked)
+                    ParsingResult mpResult = multipartParser.parse(data, position, httpRequest);
+                    if (mpResult.getProcessedPosition() >= 0)
+                        removeProcessedData(data, mpResult.getProcessedPosition());
+                    return mpResult;
 
                 default:
-                    return error("Invalid parser state: " + currentState);
+                    return error("Invalid State");
             }
         }
-
         removeProcessedData(data, position);
         return ParsingResult.needMoreData();
     }
 
+    private void switchToDiskMode() throws IOException {
+        if (streamingBodyToDisk)
+            return;
+        bodyTempFile = File.createTempFile("http-body-", ".tmp");
+        bodyTempFile.deleteOnExit();
+        bodyOutputStream = new FileOutputStream(bodyTempFile);
+        streamingBodyToDisk = true;
+        httpRequest.setBodyTempFile(bodyTempFile);
+    }
+
     private boolean parseRequestLine(String line) {
         if (line.length() > MAX_REQUEST_LINE_LENGTH) {
-            errorMessage = "Request line exceeds maximum length of " + MAX_REQUEST_LINE_LENGTH;
+            errorMessage = "Request line too long";
             return false;
         }
-
         String[] parts = line.split(" ");
         if (parts.length != 3) {
-            errorMessage = "Invalid request line format: " + line;
+            errorMessage = "Invalid request line";
             return false;
         }
-
         try {
             httpRequest.setMethod(HttpMethod.fromString(parts[0]));
         } catch (InvalidMethodException e) {
@@ -392,19 +403,15 @@ public class RequestParser {
 
         String uri = parts[1];
         if (uri.length() > MAX_URI_LENGTH) {
-            errorMessage = "URI exceeds maximum length of " + MAX_URI_LENGTH;
+            errorMessage = "URI too long";
             return false;
         }
-
         int fragmentIndex = uri.indexOf('#');
-        if (fragmentIndex != -1) {
+        if (fragmentIndex != -1)
             uri = uri.substring(0, fragmentIndex);
-        }
 
-        String rawPath;
-        String rawQuery;
+        String rawPath, rawQuery;
         int queryIndex = uri.indexOf('?');
-
         if (queryIndex == -1) {
             rawPath = uri;
             rawQuery = null;
@@ -413,96 +420,69 @@ public class RequestParser {
             rawQuery = uri.substring(queryIndex + 1);
         }
 
-        String decodedPath;
         try {
-            decodedPath = URLDecoder.decode(rawPath, StandardCharsets.UTF_8.name());
+            String decoded = URLDecoder.decode(rawPath, StandardCharsets.UTF_8.name());
+            if (decoded.contains("..")) {
+                errorMessage = "Path traversal";
+                return false;
+            }
+            httpRequest.setPath(decoded);
         } catch (Exception e) {
-            errorMessage = "Malformed URL encoding in path";
+            errorMessage = "URL Decode Error";
             return false;
         }
 
-        if (decodedPath.contains("..")) {
-            errorMessage = "Path traversal detected";
-            return false;
-        }
-
-        httpRequest.setPath(decodedPath);
         httpRequest.setQueryString(rawQuery);
-
-        String version = parts[2];
-        if (!version.equals("HTTP/1.1") && !version.equals("HTTP/1.0")) {
-            errorMessage = "Unsupported HTTP version: " + version;
+        if (!parts[2].equals("HTTP/1.1") && !parts[2].equals("HTTP/1.0")) {
+            errorMessage = "Bad HTTP Version";
             return false;
         }
-
-        httpRequest.setHttpVersion(version);
-
+        httpRequest.setHttpVersion(parts[2]);
         return true;
     }
 
-    private boolean parseHeaders(byte[] data, int start, int end) {
-        int position = start;
-
-        String currentHeaderName = null;
-        StringBuilder currentHeaderValue = new StringBuilder();
-
-        while (position < end) {
-            int lineEnd = findLineEnd(data, position);
-            if (lineEnd == -1) {
+    private boolean parseHeaders(byte[] d, int s, int e) {
+        int pos = s;
+        String name = null;
+        StringBuilder val = new StringBuilder();
+        while (pos < e) {
+            int end = findLineEnd(d, pos);
+            if (end == -1)
                 break;
-            }
-
-            String line = new String(data, position, lineEnd - position, StandardCharsets.UTF_8);
-
-            if (line.length() > 0 && (line.charAt(0) == ' ' || line.charAt(0) == '\t')) {
-                if (currentHeaderName == null) {
-                    errorMessage = "Header continuation line without preceding header";
+            String line = new String(d, pos, end - pos, StandardCharsets.UTF_8);
+            if (!line.isEmpty() && (line.charAt(0) == ' ' || line.charAt(0) == '\t')) {
+                if (name == null) {
+                    errorMessage = "Bad header";
                     return false;
                 }
-
-                currentHeaderValue.append(' ').append(line.trim());
+                val.append(' ').append(line.trim());
             } else {
-                if (currentHeaderName != null) {
-                    httpRequest.getHeaders().add(currentHeaderName, currentHeaderValue.toString());
-                }
-
-                int colonIndex = line.indexOf(':');
-                if (colonIndex == -1) {
-                    errorMessage = "Invalid header format (missing colon): " + line;
+                if (name != null)
+                    addHeader(name, val.toString());
+                int col = line.indexOf(':');
+                if (col == -1) {
+                    errorMessage = "No colon in header";
                     return false;
                 }
-
-                currentHeaderName = line.substring(0, colonIndex).trim();
-                String value = line.substring(colonIndex + 1).trim();
-
-                if (currentHeaderName.isEmpty()) {
-                    errorMessage = "Empty header name";
-                    return false;
-                }
-
-                currentHeaderValue = new StringBuilder(value);
+                name = line.substring(0, col).trim();
+                val = new StringBuilder(line.substring(col + 1).trim());
             }
-
-            position = lineEnd + 2;
+            pos = end + 2;
         }
-
-        if (currentHeaderName != null) {
-            String headerValue = currentHeaderValue.toString();
-            httpRequest.getHeaders().add(currentHeaderName, headerValue);
-
-            // Parse cookies from Cookie header (handle last header)
-            if (currentHeaderName.equalsIgnoreCase("Cookie")) {
-                String[] pairs = headerValue.split(";");
-                for (String pair : pairs) {
-                    String[] keyValue = pair.split("=", 2);
-                    if (keyValue.length == 2) {
-                        httpRequest.addCookie(keyValue[0].trim(), keyValue[1].trim());
-                    }
-                }
-            }
-        }
-
+        if (name != null)
+            addHeader(name, val.toString());
         return true;
+    }
+
+    private void addHeader(String name, String val) {
+        httpRequest.getHeaders().add(name, val);
+        if (name.equalsIgnoreCase("Cookie")) {
+            for (String p : val.split(";")) {
+                String[] kv = p.split("=", 2);
+                if (kv.length == 2)
+                    httpRequest.addCookie(kv[0].trim(), kv[1].trim());
+            }
+        }
     }
 
     private int findLineEnd(byte[] data, int startPos) {
@@ -533,10 +513,10 @@ public class RequestParser {
         }
     }
 
-    private ParsingResult error(String message) {
-        this.errorMessage = message;
-        this.currentState = State.ERROR;
-        return ParsingResult.error(message);
+    private ParsingResult error(String msg) {
+        errorMessage = msg;
+        currentState = State.ERROR;
+        return ParsingResult.error(msg);
     }
 
     private String extractBoundary(String contentType) {
@@ -557,5 +537,4 @@ public class RequestParser {
         }
         return null;
     }
-
 }
