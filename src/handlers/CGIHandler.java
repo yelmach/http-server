@@ -5,9 +5,7 @@ import http.HttpRequest;
 import http.HttpStatusCode;
 import http.ResponseBuilder;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import utils.ServerLogger;
 
@@ -24,7 +22,6 @@ public class CGIHandler implements Handler {
 
     @Override
     public void handle(HttpRequest request, ResponseBuilder response) throws IOException {
-
         if (!resource.exists()) {
             logger.severe("CGI script not found");
             response.status(HttpStatusCode.NOT_FOUND).body("CGI script not found");
@@ -41,7 +38,6 @@ public class CGIHandler implements Handler {
         pb.directory(resource.getParentFile());
 
         Map<String, String> env = pb.environment();
-
         env.put("SERVER_PROTOCOL", "HTTP/1.1");
         env.put("REQUEST_METHOD", request.getMethod().toString());
         env.put("QUERY_STRING", request.getQueryString() != null ? request.getQueryString() : "");
@@ -49,53 +45,29 @@ public class CGIHandler implements Handler {
 
         String contentType = request.getHeaders().get("content-type");
         String contentLength = request.getHeaders().get("content-length");
-
         env.put("CONTENT_TYPE", contentType != null ? contentType : "");
         env.put("CONTENT_LENGTH", contentLength != null ? contentLength : "0");
 
-        Process process = pb.start();
-
-        if (request.getBody() != null && request.getBody().length > 0) {
-            try (OutputStream os = process.getOutputStream()) {
-                os.write(request.getBody());
-                os.flush();
-            }
-        }
-
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-        try (InputStream is = process.getInputStream()) {
-            is.transferTo(stdout);
-        }
-
-        try (InputStream es = process.getErrorStream()) {
-            es.transferTo(OutputStream.nullOutputStream());
-        }
-
         try {
-            if (!process.waitFor(5, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                logger.severe("CGI execution timeout");
-                response.status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-                        .body("CGI execution timeout");
-                return;
+            Process process = pb.start();
+
+            if (request.getBody() != null && request.getBody().length > 0) {
+                try (OutputStream os = process.getOutputStream()) {
+                    os.write(request.getBody());
+                    os.flush();
+                } catch (IOException e) {
+                    process.destroy();
+                    throw e;
+                }
+            } else {
+                process.getOutputStream().close();
             }
-        } catch (InterruptedException e) {
-            logger.severe("CGI execution interrupted");
-            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-                    .body("CGI execution interrupted");
-            return;
+
+            response.setPendingProcess(process);
+
+        } catch (IOException e) {
+            logger.severe("Failed to start CGI: " + e.getMessage());
+            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR).body("CGI Launch Failed");
         }
-
-        if (process.exitValue() != 0) {
-            logger.severe("CGI execution failed");
-            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-                    .body("CGI execution failed");
-            return;
-        }
-
-        String cgiOutput = stdout.toString(StandardCharsets.UTF_8);
-
-        response.body(cgiOutput);
-        response.status(HttpStatusCode.OK);
     }
 }
