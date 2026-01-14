@@ -1,5 +1,6 @@
 package http;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
@@ -13,6 +14,7 @@ public class ResponseBuilder {
     private HttpStatusCode statusCode;
     private final HttpHeaders headers;
     private byte[] body;
+    private File bodyFile;
     private Process pendingProcess;
 
     public ResponseBuilder() {
@@ -59,6 +61,20 @@ public class ResponseBuilder {
         return this;
     }
 
+    public ResponseBuilder body(File file) {
+        this.bodyFile = file;
+        this.body = new byte[0];
+        return this;
+    }
+
+    public File getBodyFile() {
+        return bodyFile;
+    }
+
+    public boolean hasFile() {
+        return bodyFile != null;
+    }
+
     public ByteBuffer buildResponse() {
         setAutoHeaders();
 
@@ -73,6 +89,11 @@ public class ResponseBuilder {
 
         byte[] headerBytes = head.toString().getBytes(StandardCharsets.UTF_8);
 
+        // If it's a file, ONLY return headers. The body is streamed separately.
+        if (bodyFile != null) {
+            return ByteBuffer.wrap(headerBytes);
+        }
+
         ByteBuffer buffer = ByteBuffer.allocate(headerBytes.length + body.length);
         buffer.put(headerBytes);
         buffer.put(body);
@@ -85,12 +106,15 @@ public class ResponseBuilder {
         if (!headers.has("date")) {
             headers.add("date", ZonedDateTime.now(ZoneId.of("GMT")).format(DATE_FORMAT));
         }
-
         if (!headers.has("Connection")) {
             headers.add("Connection", "keep-alive");
         }
 
-        headers.add("Content-Length", String.valueOf(body.length));
+        if (bodyFile != null) {
+            headers.add("Content-Length", String.valueOf(bodyFile.length()));
+        } else {
+            headers.add("Content-Length", String.valueOf(body.length));
+        }
     }
 
     public void setPendingProcess(Process process) {

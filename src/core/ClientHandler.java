@@ -9,12 +9,15 @@ import http.ParsingResult;
 import http.RequestParser;
 import http.ResponseBuilder;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.nio.file.StandardOpenOption;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -45,6 +48,11 @@ public class ClientHandler {
     private HttpRequest pendingRequest;
     private ByteArrayOutputStream cgiOutputBuffer;
     private int cgiOutputSize = 0;
+
+    // Static File Streaming
+    private FileChannel fileChannel;
+    private long filePosition;
+    private long fileSize;
 
     public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey, List<ServerConfig> virtualHosts) {
         this.client = clientChannel;
@@ -128,6 +136,19 @@ public class ClientHandler {
             return;
         }
 
+        // Check for Static File
+        if (responseBuilder.hasFile()) {
+            try {
+                File file = responseBuilder.getBodyFile();
+                this.fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ);
+                this.fileSize = file.length();
+                this.filePosition = 0;
+            } catch (IOException e) {
+                logger.severe("Failed to open file: " + e.getMessage());
+                responseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR).body("Error reading file");
+            }
+        }
+
         finishRequest(responseBuilder, currentRequest);
     }
 
@@ -136,12 +157,21 @@ public class ClientHandler {
                 : HttpStatusCode.INTERNAL_SERVER_ERROR;
 
         if (statusCode.isError()) {
+            // Close file channel if we are switching to an error page
+            if (this.fileChannel != null) {
+                try {
+                    this.fileChannel.close();
+                } catch (IOException ignored) {
+                }
+                this.fileChannel = null;
+            }
             ErrorHandler errorHandler = new ErrorHandler(statusCode, currentConfig);
             errorHandler.handle(currentRequest, responseBuilder);
         }
 
         keepAlive = (currentRequest != null) && currentRequest.shouldKeepAlive();
 
+        // This puts the Headers (and small body if any) into the queue
         responseQueue.add(responseBuilder.buildResponse());
         logger.info("Request handled: " + statusCode + " for " + currentConfig.getServerName());
 
@@ -169,7 +199,7 @@ public class ClientHandler {
                         isCgiRunning = false;
 
                         pendingResponseBuilder.status(HttpStatusCode.PAYLOAD_TOO_LARGE)
-                                              .body("CGI output too large (max " + MAX_CGI_OUTPUT + " bytes)");
+                                .body("CGI output too large (max " + MAX_CGI_OUTPUT + " bytes)");
                         finishRequest(pendingResponseBuilder, pendingRequest);
                         return;
                     }
@@ -208,7 +238,7 @@ public class ClientHandler {
                     if (cgiOutputSize + read > MAX_CGI_OUTPUT) {
                         logger.warning("CGI output exceeds limit during final read");
                         pendingResponseBuilder.status(HttpStatusCode.PAYLOAD_TOO_LARGE)
-                                              .body("CGI output too large (max " + MAX_CGI_OUTPUT + " bytes)");
+                                .body("CGI output too large (max " + MAX_CGI_OUTPUT + " bytes)");
                         finishRequest(pendingResponseBuilder, pendingRequest);
                         return;
                     }
@@ -234,6 +264,7 @@ public class ClientHandler {
     public void write() throws IOException {
         lastActivityTime = System.currentTimeMillis();
 
+        // 1. Send Headers (or error messages) from Queue
         ByteBuffer responseBuffer = responseQueue.peek();
 
         if (responseBuffer != null) {
@@ -241,14 +272,44 @@ public class ClientHandler {
 
             if (!responseBuffer.hasRemaining()) {
                 responseQueue.poll();
+            }
+            // If we still have queue items, return and continue writing next loop
+            // to be fair to other clients.
+            return;
+        }
 
-                if (responseQueue.isEmpty()) {
-                    if (keepAlive) {
-                        selectionKey.interestOps(SelectionKey.OP_READ);
-                    } else {
-                        close();
-                    }
+        // 2. Stream File Body (Zero-Copy)
+        if (fileChannel != null && fileChannel.isOpen()) {
+            long count = 8192 * 4; // Send ~32KB per select loop
+            long transferred = fileChannel.transferTo(filePosition, count, client);
+
+            if (transferred > 0) {
+                filePosition += transferred;
+            }
+
+            // Done sending file
+            if (filePosition >= fileSize) {
+                fileChannel.close();
+                fileChannel = null;
+                logger.info("File transfer complete.");
+
+                if (!keepAlive) {
+                    close();
+                } else {
+                    selectionKey.interestOps(SelectionKey.OP_READ);
                 }
+            }
+            // If not done, we exit here.
+            // The selector is still interested in OP_WRITE, so it will call write() again.
+            return;
+        }
+
+        // 3. Nothing to write
+        if (responseQueue.isEmpty()) {
+            if (keepAlive) {
+                selectionKey.interestOps(SelectionKey.OP_READ);
+            } else {
+                close();
             }
         }
     }
@@ -289,6 +350,11 @@ public class ClientHandler {
         if (cgiProcess != null && cgiProcess.isAlive()) {
             cgiProcess.destroyForcibly();
         }
+
+        if (fileChannel != null) {
+            fileChannel.close(); // Close file channel
+        }
+
         selectionKey.cancel();
         client.close();
     }
