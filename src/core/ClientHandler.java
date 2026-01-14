@@ -95,8 +95,32 @@ public class ClientHandler {
             }
 
             if (result.isError()) {
-                logger.severe("Parsing error: " + result.getErrorMessage());
-                close();
+                logger.severe("=> Parsing error: " + result.getErrorMessage());
+
+                if (currentConfig == null) {
+                    currentConfig = resolveConfig(null);
+                }
+
+                HttpStatusCode code = HttpStatusCode.BAD_REQUEST; // Default 400
+                String msg = result.getErrorMessage().toLowerCase();
+
+                if (msg.contains("http method")) {
+                    code = HttpStatusCode.METHOD_NOT_ALLOWED;
+                }
+
+                if (msg.contains("too large") || msg.contains("exceeded") || msg.contains("maximum")) {
+                    code = HttpStatusCode.PAYLOAD_TOO_LARGE; // 413
+                } else if (msg.contains("unsupported") || msg.contains("not implemented")) {
+                    code = HttpStatusCode.NOT_IMPLEMENTED; // 501
+                }
+
+                ResponseBuilder errorBuilder = new ResponseBuilder();
+                errorBuilder.status(code);
+                errorBuilder.header("Connection", "close");
+
+                finishRequest(errorBuilder, null);
+
+                return;
             }
 
             // Only switch to WRITE if we aren't waiting for a CGI process
@@ -118,6 +142,7 @@ public class ClientHandler {
             handler.handle(currentRequest, responseBuilder);
         } catch (Exception e) {
             logger.severe("Handler Error: " + e.getMessage());
+            responseBuilder = new ResponseBuilder();
             responseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
         }
 
@@ -145,6 +170,7 @@ public class ClientHandler {
                 this.filePosition = 0;
             } catch (IOException e) {
                 logger.severe("Failed to open file: " + e.getMessage());
+                responseBuilder = new ResponseBuilder();
                 responseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR).body("Error reading file");
             }
         }
@@ -210,6 +236,11 @@ public class ClientHandler {
             }
         } catch (IOException e) {
             logger.severe("Error reading CGI stream: " + e.getMessage());
+            cgiProcess.destroyForcibly();
+            isCgiRunning = false;
+            pendingResponseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR).body("CGI Stream Error");
+            finishRequest(pendingResponseBuilder, pendingRequest);
+            return;
         }
 
         // 2. Check Timeout
@@ -218,7 +249,7 @@ public class ClientHandler {
             cgiProcess.destroyForcibly();
             isCgiRunning = false;
 
-            pendingResponseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR).body("CGI Timeout");
+            pendingResponseBuilder.status(HttpStatusCode.REQUEST_TIMEOUT).body("CGI Timeout");
             finishRequest(pendingResponseBuilder, pendingRequest);
             return;
         }
@@ -352,7 +383,11 @@ public class ClientHandler {
         }
 
         if (fileChannel != null) {
-            fileChannel.close(); // Close file channel
+            fileChannel.close();
+        }
+
+        if (parser != null) {
+            parser.cleanup();
         }
 
         selectionKey.cancel();

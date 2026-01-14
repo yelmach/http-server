@@ -132,7 +132,7 @@ public class RequestParser {
                     int endLinePos = findLineEnd(data, position);
                     if (endLinePos == -1) {
                         if (data.length >= MAX_REQUEST_LINE_LENGTH)
-                            return error("Request line too long");
+                            return error("Request line too large");
                         return ParsingResult.needMoreData();
                     }
                     String requestLine = new String(data, position, endLinePos - position, StandardCharsets.UTF_8);
@@ -386,7 +386,7 @@ public class RequestParser {
 
     private boolean parseRequestLine(String line) {
         if (line.length() > MAX_REQUEST_LINE_LENGTH) {
-            errorMessage = "Request line too long";
+            errorMessage = "Request line too large";
             return false;
         }
         String[] parts = line.split(" ");
@@ -403,7 +403,7 @@ public class RequestParser {
 
         String uri = parts[1];
         if (uri.length() > MAX_URI_LENGTH) {
-            errorMessage = "URI too long";
+            errorMessage = "URI too large";
             return false;
         }
         int fragmentIndex = uri.indexOf('#');
@@ -536,5 +536,22 @@ public class RequestParser {
             }
         }
         return null;
+    }
+
+    public void cleanup() {
+        try {
+            if (bodyOutputStream != null) {
+                bodyOutputStream.close();
+            }
+        } catch (IOException e) {
+        }
+
+        if (bodyTempFile != null && bodyTempFile.exists()) {
+            bodyTempFile.delete();
+        }
+
+        if (multipartParser != null) {
+            multipartParser.cleanup();
+        }
     }
 }
