@@ -31,11 +31,6 @@ public class ConfigLoader {
             return null;
         }
 
-        // Validate servers fields
-        if (!ConfigValidator.validateServersFields(result)) {
-            return null;
-        }
-
         AppConfig config = new AppConfig();
         config.setName((String) result.get("name"));
         config.setVersion((String) result.get("version"));
@@ -45,6 +40,10 @@ public class ConfigLoader {
 
         List<Map<String, Object>> servers = (List<Map<String, Object>>) result.get("servers");
         for (Map<String, Object> serverMap : servers) {
+
+            if (!ConfigValidator.validateServer(serverMap)) {
+                continue;
+            }
 
             ServerConfig serverConfig = new ServerConfig();
 
@@ -74,13 +73,10 @@ public class ConfigLoader {
             serverConfig.setRoutes(routes);
 
             config.addServers(serverConfig);
+        }
 
-            if (serverConfig.isDefault()) {
-                if (config.getDefaultServer() != null) {
-                    throw new RuntimeException("Conflict: Multiple default servers!");
-                }
-                config.setDefaultServer(serverConfig);
-            }
+        if (config.getServers() == null || config.getServers().size() < 1) {
+            throw new RuntimeException("Conflict: At least one VALID server must be provided!");
         }
 
         return config;
