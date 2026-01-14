@@ -51,16 +51,22 @@ public class CGIHandler implements Handler {
         try {
             Process process = pb.start();
 
-            if (request.getBody() != null && request.getBody().length > 0) {
-                try (OutputStream os = process.getOutputStream()) {
+            try (OutputStream os = process.getOutputStream()) {
+                if (request.getBody() != null && request.getBody().length > 0) {
                     os.write(request.getBody());
-                    os.flush();
-                } catch (IOException e) {
-                    process.destroy();
-                    throw e;
+                } else if (request.getBodyTempFile() != null && request.getBodyTempFile().exists()) {
+                    try (FileInputStream fis = new FileInputStream(request.getBodyTempFile())) {
+                        byte[] buffer = new byte[8192];
+                        int bytesRead;
+                        while ((bytesRead = fis.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                    }
                 }
-            } else {
-                process.getOutputStream().close();
+                os.flush();
+            } catch (IOException e) {
+                process.destroy();
+                throw e;
             }
 
             response.setPendingProcess(process);

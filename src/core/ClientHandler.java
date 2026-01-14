@@ -143,7 +143,9 @@ public class ClientHandler {
         } catch (Exception e) {
             logger.severe("Handler Error: " + e.getMessage());
             responseBuilder = new ResponseBuilder();
-            responseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
+            HttpStatusCode statusCode = responseBuilder.getStatusCode() != null ? responseBuilder.getStatusCode()
+                    : HttpStatusCode.INTERNAL_SERVER_ERROR;
+            responseBuilder.status(statusCode);
         }
 
         // Check if the Handler started a CGI process (Non-Blocking)
@@ -200,6 +202,10 @@ public class ClientHandler {
         // This puts the Headers (and small body if any) into the queue
         responseQueue.add(responseBuilder.buildResponse());
         logger.info("Request handled: " + statusCode + " for " + currentConfig.getServerName());
+
+        if (currentRequest != null) {
+            currentRequest.cleanup();
+        }
 
         if (selectionKey.isValid()) {
             selectionKey.interestOps(SelectionKey.OP_WRITE);

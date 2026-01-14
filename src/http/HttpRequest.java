@@ -115,4 +115,13 @@ public class HttpRequest {
     public String getCookie(String name) {
         return cookies.get(name);
     }
+
+    public void cleanup() {
+        if (bodyTempFile != null && bodyTempFile.exists()) {
+            boolean deleted = bodyTempFile.delete();
+            if (!deleted) {
+                System.err.println("Failed to delete temp file: " + bodyTempFile.getAbsolutePath());
+            }
+        }
+    }
 }
