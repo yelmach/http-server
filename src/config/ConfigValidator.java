@@ -61,6 +61,12 @@ public class ConfigValidator {
         }
 
         Object maxBodySize = server.get("maxBodySize");
+
+        if (maxBodySize == null) {
+            logger.severe("Invalid or missing 'maxBodySize' field in server.");
+            return false;
+        }
+
         if (maxBodySize != null) {
             if (!(maxBodySize instanceof Integer) || (Integer) maxBodySize <= 0) {
                 logger.severe("Invalid 'maxBodySize' field.");
