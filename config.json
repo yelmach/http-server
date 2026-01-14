@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "servers": [
     {
-      "host": "555.0.0.1",
+      "host": "127.0.0.1",
       "ports": [8080],
       "serverName": "localhost",
       "defaultServer": true,
@@ -58,6 +58,20 @@
           "path": "/session",
           "methods": ["GET"],
           "root": "./www"
+        }
+      ]
+    },
+    {
+      "host": "127.0.0.1",
+      "ports": [8081],
+      "serverName": "localhost",
+      "maxBodySize": 104857600,
+      "routes": [
+        {
+          "path": "/",
+          "root": "./www/scripts/cgi-3.py",
+          "methods": ["GET", "POST"],
+          "cgiExtension": "py"
         }
       ]
     }
