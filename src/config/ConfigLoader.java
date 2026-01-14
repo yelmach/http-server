@@ -73,17 +73,6 @@ public class ConfigLoader {
             serverConfig.setRoutes(routes);
 
             config.addServers(serverConfig);
-
-            if (serverConfig.isDefault()) {
-                if (config.getDefaultServer() != null) {
-                    throw new RuntimeException("Conflict: Multiple default servers!");
-                }
-                config.setDefaultServer(serverConfig);
-            }
-        }
-
-        if (config.getDefaultServer() == null) {
-            throw new RuntimeException("No default server defined.");
         }
 
         if (config.getServers() == null || config.getServers().size() < 1) {
