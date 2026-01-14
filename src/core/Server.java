@@ -80,9 +80,22 @@ public class Server {
                         handleWrite(key);
                     }
                 } catch (IOException e) {
-                    logger.severe(e.getMessage());
+                    logger.severe("Client error: " + e.getMessage());
+
+                    // close resources (FileChannel, CGI Process)
+                    Object attachment = key.attachment();
+                    if (attachment instanceof ClientHandler) {
+                        try {
+                            ((ClientHandler) attachment).close();
+                        } catch (IOException closeEx) {
+                        }
+                    }
+
                     key.cancel();
-                    key.channel().close();
+                    try {
+                        key.channel().close();
+                    } catch (IOException ignored) {
+                    }
                 }
             }
         }

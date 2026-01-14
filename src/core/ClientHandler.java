@@ -346,7 +346,7 @@ public class ClientHandler {
         return (currentTime - lastActivityTime) > timeoutMs;
     }
 
-    private void close() throws IOException {
+    void close() throws IOException {
         if (cgiProcess != null && cgiProcess.isAlive()) {
             cgiProcess.destroyForcibly();
         }
