@@ -1,7 +1,5 @@
 package config;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +11,9 @@ public class ConfigValidator {
 
     private final static Logger logger = ServerLogger.get();
     private static Set<String> allowed = Set.of("GET", "POST", "DELETE");
+    private static final String IPV4_REGEX
+            = "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}"
+            + "(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$";
 
     public static boolean validateGeneralFields(Map<String, Object> json) {
         if (json.get("name") == null || !(json.get("name") instanceof String)) {
@@ -54,10 +55,8 @@ public class ConfigValidator {
         }
 
         String hostStr = (String) host;
-        try {
-            InetAddress.getByName(hostStr);
-        } catch (UnknownHostException e) {
-            logger.severe("Invalid IP address: " + hostStr);
+        if (!hostStr.matches(IPV4_REGEX)) {
+            logger.severe("Invalid IPv4 address: " + hostStr);
             return false;
         }
 
@@ -111,6 +110,7 @@ public class ConfigValidator {
         }
 
         Object routes = server.get("routes");
+        Set<String> paths = new HashSet<>();
         if (routes instanceof java.util.List) {
             for (Object routeObj : (java.util.List<?>) routes) {
                 Map<String, Object> route = (Map<String, Object>) routeObj;
@@ -123,6 +123,11 @@ public class ConfigValidator {
 
                 if (!path.startsWith("/")) {
                     logger.severe("Route path must start with '/': " + path);
+                    return false;
+                }
+
+                if (!paths.add(path)) {
+                    logger.severe("Duplicate route path: " + path);
                     return false;
                 }
 
