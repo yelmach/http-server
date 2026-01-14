@@ -13,6 +13,7 @@ public class ResponseBuilder {
     private HttpStatusCode statusCode;
     private final HttpHeaders headers;
     private byte[] body;
+    private Process pendingProcess;
 
     public ResponseBuilder() {
         headers = new HttpHeaders();
@@ -90,5 +91,17 @@ public class ResponseBuilder {
         }
 
         headers.add("Content-Length", String.valueOf(body.length));
+    }
+
+    public void setPendingProcess(Process process) {
+        this.pendingProcess = process;
+    }
+
+    public Process getPendingProcess() {
+        return pendingProcess;
+    }
+
+    public boolean hasPendingProcess() {
+        return pendingProcess != null;
     }
 }
