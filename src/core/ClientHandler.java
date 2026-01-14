@@ -8,7 +8,9 @@ import http.HttpStatusCode;
 import http.ParsingResult;
 import http.RequestParser;
 import http.ResponseBuilder;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -33,6 +35,14 @@ public class ClientHandler {
     private final Logger logger = ServerLogger.get();
     private final List<ServerConfig> virtualHosts;
     private ServerConfig currentConfig;
+
+    // CGI
+    private Process cgiProcess;
+    private boolean isCgiRunning = false;
+    private long cgiStartTime;
+    private ResponseBuilder pendingResponseBuilder;
+    private HttpRequest pendingRequest;
+    private ByteArrayOutputStream cgiOutputBuffer;
 
     public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey, List<ServerConfig> virtualHosts) {
         this.client = clientChannel;
@@ -79,7 +89,8 @@ public class ClientHandler {
                 close();
             }
 
-            if (!responseQueue.isEmpty()) {
+            // Only switch to WRITE if we aren't waiting for a CGI process
+            if (!responseQueue.isEmpty() && !isCgiRunning) {
                 selectionKey.interestOps(SelectionKey.OP_WRITE);
             }
         }
@@ -96,21 +107,98 @@ public class ClientHandler {
         try {
             handler.handle(currentRequest, responseBuilder);
         } catch (Exception e) {
-            // TODO: handle exception
+            logger.severe("Handler Error: " + e.getMessage());
+            responseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
         }
 
+        // Check if the Handler started a CGI process (Non-Blocking)
+        if (responseBuilder.hasPendingProcess()) {
+            this.cgiProcess = responseBuilder.getPendingProcess();
+            this.pendingResponseBuilder = responseBuilder;
+            this.pendingRequest = currentRequest;
+            this.isCgiRunning = true;
+            this.cgiStartTime = System.currentTimeMillis();
+            this.cgiOutputBuffer = new ByteArrayOutputStream();
+
+            // We pause InterestOps because we are waiting for the Process, not the Socket
+            selectionKey.interestOps(0);
+            return;
+        }
+
+        finishRequest(responseBuilder, currentRequest);
+    }
+
+    private void finishRequest(ResponseBuilder responseBuilder, HttpRequest currentRequest) {
         HttpStatusCode statusCode = responseBuilder.getStatusCode() != null ? responseBuilder.getStatusCode()
                 : HttpStatusCode.INTERNAL_SERVER_ERROR;
+
         if (statusCode.isError()) {
             ErrorHandler errorHandler = new ErrorHandler(statusCode, currentConfig);
             errorHandler.handle(currentRequest, responseBuilder);
         }
 
-        keepAlive = currentRequest.shouldKeepAlive();
+        keepAlive = (currentRequest != null) && currentRequest.shouldKeepAlive();
 
         responseQueue.add(responseBuilder.buildResponse());
-        logger.info("handle request for " + currentConfig.getServerName() + ": " + currentRequest.getMethod() + " "
-                + currentRequest.getPath());
+        logger.info("Request handled: " + statusCode + " for " + currentConfig.getServerName());
+
+        if (selectionKey.isValid()) {
+            selectionKey.interestOps(SelectionKey.OP_WRITE);
+        }
+    }
+
+    // Called by Server.java loop to check if the CGI process has finished.
+    public void checkCgiProcess() {
+        if (!isCgiRunning)
+            return;
+
+        // 1. We read whatever is available right now
+        try {
+            InputStream is = cgiProcess.getInputStream();
+            while (is.available() > 0) {
+                byte[] chunk = new byte[8192];
+                int read = is.read(chunk);
+                if (read > 0) {
+                    cgiOutputBuffer.write(chunk, 0, read);
+                }
+            }
+        } catch (IOException e) {
+            logger.severe("Error reading CGI stream: " + e.getMessage());
+        }
+
+        // 2. Check Timeout
+        if (System.currentTimeMillis() - cgiStartTime > 5000) {
+            logger.severe("CGI Execution Timed Out");
+            cgiProcess.destroyForcibly();
+            isCgiRunning = false;
+
+            pendingResponseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR).body("CGI Timeout");
+            finishRequest(pendingResponseBuilder, pendingRequest);
+            return;
+        }
+
+        // 3. Poll Process Status
+        if (!cgiProcess.isAlive()) {
+            isCgiRunning = false;
+
+            try {
+                // Read any remaining bytes that arrived
+                InputStream is = cgiProcess.getInputStream();
+                is.transferTo(cgiOutputBuffer);
+
+                byte[] fullOutput = cgiOutputBuffer.toByteArray();
+
+                // Set body (Raw output)
+                pendingResponseBuilder.body(fullOutput);
+                pendingResponseBuilder.status(HttpStatusCode.OK);
+
+            } catch (IOException e) {
+                logger.severe("Error finalizing CGI output: " + e.getMessage());
+                pendingResponseBuilder.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
+            }
+
+            finishRequest(pendingResponseBuilder, pendingRequest);
+        }
     }
 
     public void write() throws IOException {
@@ -168,6 +256,9 @@ public class ClientHandler {
     }
 
     private void close() throws IOException {
+        if (cgiProcess != null && cgiProcess.isAlive()) {
+            cgiProcess.destroyForcibly();
+        }
         selectionKey.cancel();
         client.close();
     }

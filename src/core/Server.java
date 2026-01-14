@@ -54,9 +54,11 @@ public class Server {
         }
 
         while (true) {
-            selector.select(1000);
+            selector.select(50);
 
             checkTimeouts();
+
+            checkPendingCGI();
 
             // Get list of events
             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
@@ -125,6 +127,15 @@ public class Server {
                         logger.severe("Error closing timed-out connection: " + e.getMessage());
                     }
                 }
+            }
+        }
+    }
+
+    private void checkPendingCGI() {
+        for (SelectionKey key : selector.keys()) {
+            if (key.isValid() && key.attachment() instanceof ClientHandler) {
+                ClientHandler handler = (ClientHandler) key.attachment();
+                handler.checkCgiProcess();
             }
         }
     }
