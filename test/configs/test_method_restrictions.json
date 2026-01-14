@@ -1,0 +1,36 @@
+{
+  "name": "http-server-method-restrictions-test",
+  "version": "1.0.0",
+  "servers": [
+    {
+      "host": "127.0.0.1",
+      "ports": [8080],
+      "serverName": "localhost",
+      "defaultServer": true,
+      "maxBodySize": 1048576,
+      "routes": [
+        {
+          "path": "/read-only",
+          "methods": ["GET"],
+          "root": "./www",
+          "directoryListing": true
+        },
+        {
+          "path": "/upload-only",
+          "methods": ["POST"],
+          "root": "./www/uploads"
+        },
+        {
+          "path": "/delete-only",
+          "methods": ["DELETE"],
+          "root": "./www/uploads"
+        },
+        {
+          "path": "/all-methods",
+          "methods": ["GET", "POST", "DELETE"],
+          "root": "./www"
+        }
+      ]
+    }
+  ]
+}
