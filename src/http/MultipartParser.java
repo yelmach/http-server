@@ -10,6 +10,9 @@ import java.util.List;
 
 public class MultipartParser {
 
+    // Limit non-file fields to 64KB
+    private static final int MAX_FIELD_SIZE = 64 * 1024;
+
     private final String boundary;
     private final int maxBodySize;
 
@@ -40,12 +43,14 @@ public class MultipartParser {
                     return ParsingResult.needMoreData(position);
                 }
 
+                // Check for End Boundary (--boundary--)
                 if (isEndBoundary(data, boundaryPos, boundary)) {
                     httpRequest.setMultipartParts(multipartParts);
                     int endBoundaryLength = ("--" + boundary + "--").length();
                     return ParsingResult.complete(httpRequest, boundaryPos + endBoundaryLength);
                 }
 
+                // Move past boundary + CRLF
                 position = boundaryPos + boundary.length() + 2;
 
                 if (position + 2 <= data.length && data[position] == '\r' && data[position + 1] == '\n') {
@@ -58,19 +63,19 @@ public class MultipartParser {
                 }
 
                 currentPart = parsePartHeaders(data, position, partHeadersEnd);
-                if (currentPart == null) {
-                    return ParsingResult.error("Failed to parse multipart part headers");
-                }
+                if (currentPart == null)
+                    return ParsingResult.error("Bad part headers");
 
-                position = partHeadersEnd + 4;
+                position = partHeadersEnd + 4; // Skip \r\n\r\n
 
+                // Setup storage (Disk for files, RAM for small fields)
                 if (currentPart.isFile()) {
                     try {
                         currentPartTempFile = File.createTempFile("http-part-", ".tmp");
                         currentPartOutputStream = new FileOutputStream(currentPartTempFile);
                         currentPart.setTempFile(currentPartTempFile);
                     } catch (IOException e) {
-                        return ParsingResult.error("Failed to create temp file for multipart part: " + e.getMessage());
+                        return ParsingResult.error("Temp file error: " + e.getMessage());
                     }
                 } else {
                     currentPartContent = new ByteArrayOutputStream();
@@ -79,44 +84,36 @@ public class MultipartParser {
                 parsingPartHeaders = false;
 
             } else {
+                // Reading Part Content
                 int nextBoundaryPos = findBoundary(data, position, boundary);
 
                 if (nextBoundaryPos == -1) {
+                    // No boundary found, write everything to current part
                     int bytesToWrite = data.length - position;
                     if (bytesToWrite > 0) {
-                        try {
-                            if (currentPart.isFile()) {
-                                currentPartOutputStream.write(data, position, bytesToWrite);
-                            } else {
-                                currentPartContent.write(data, position, bytesToWrite);
-                            }
-                            bodyBytesRead += bytesToWrite;
-
-                            if (bodyBytesRead > maxBodySize) {
-                                return ParsingResult.error("Multipart body exceeds maximum size");
-                            }
-                        } catch (IOException e) {
-                            return ParsingResult.error("Failed to write multipart part content: " + e.getMessage());
+                        if (writeToPart(data, position, bytesToWrite)) {
+                            // Write successful
+                        } else {
+                            return ParsingResult.error("Field size exceeded limit");
                         }
+
+                        // Safety check on total size
+                        bodyBytesRead += bytesToWrite;
+                        if (bodyBytesRead > maxBodySize)
+                            return ParsingResult.error("Total body size exceeded");
                     }
                     return ParsingResult.needMoreData(data.length);
 
                 } else {
-                    int contentEnd = nextBoundaryPos - 2;
-                    if (contentEnd < position) {
+                    // Boundary found, finish this part
+                    int contentEnd = nextBoundaryPos - 2; // Backtrack for CRLF
+                    if (contentEnd < position)
                         contentEnd = position;
-                    }
 
                     int bytesToWrite = contentEnd - position;
                     if (bytesToWrite > 0) {
-                        try {
-                            if (currentPart.isFile()) {
-                                currentPartOutputStream.write(data, position, bytesToWrite);
-                            } else {
-                                currentPartContent.write(data, position, bytesToWrite);
-                            }
-                        } catch (IOException e) {
-                            return ParsingResult.error("Failed to write multipart part content: " + e.getMessage());
+                        if (!writeToPart(data, position, bytesToWrite)) {
+                            return ParsingResult.error("Field size exceeded limit");
                         }
                     }
 
@@ -127,7 +124,7 @@ public class MultipartParser {
                             currentPart.setContent(currentPartContent.toByteArray());
                         }
                     } catch (IOException e) {
-                        return ParsingResult.error("Failed to close multipart part: " + e.getMessage());
+                        return ParsingResult.error("Close error");
                     }
 
                     multipartParts.add(currentPart);
@@ -135,13 +132,29 @@ public class MultipartParser {
                     currentPartOutputStream = null;
                     currentPartContent = null;
 
-                    position = nextBoundaryPos;
+                    position = nextBoundaryPos; // Loop back to handle boundary
                     parsingPartHeaders = true;
                 }
             }
         }
-
         return ParsingResult.needMoreData(position);
+    }
+
+    private boolean writeToPart(byte[] data, int offset, int length) {
+        try {
+            if (currentPart.isFile()) {
+                currentPartOutputStream.write(data, offset, length);
+            } else {
+                // SECURITY CHECK: RAM DoS Protection
+                if (currentPartContent.size() + length > MAX_FIELD_SIZE) {
+                    return false;
+                }
+                currentPartContent.write(data, offset, length);
+            }
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private int findBoundary(byte[] data, int startPos, String boundary) {
@@ -245,16 +258,6 @@ public class MultipartParser {
             }
         }
         return -1;
-    }
-
-    public void reset() {
-        multipartParts = new ArrayList<>();
-        currentPart = null;
-        currentPartTempFile = null;
-        currentPartOutputStream = null;
-        currentPartContent = null;
-        parsingPartHeaders = true;
-        bodyBytesRead = 0;
     }
 
     public void cleanup() {

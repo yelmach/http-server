@@ -44,13 +44,26 @@ public class Server {
             String host = parts[0];
             int port = Integer.parseInt(parts[1]);
 
-            ServerSocketChannel serverSocket = ServerSocketChannel.open();
-            serverSocket.bind(new InetSocketAddress(host, port));
-            serverSocket.configureBlocking(false);
-            serverSocket.register(selector, SelectionKey.OP_ACCEPT, virtualHosts);
+            ServerSocketChannel serverSocket = null;
+            try {
+                serverSocket = ServerSocketChannel.open();
+                serverSocket.configureBlocking(false);
+                serverSocket.bind(new InetSocketAddress(host, port));
+                serverSocket.register(selector, SelectionKey.OP_ACCEPT, virtualHosts);
 
-            logger.info("Server bound to " + host + ":" + port + " with " + virtualHosts.size() + " virtual hosts: " +
-                    virtualHosts.stream().map(ServerConfig::getServerName).collect(Collectors.joining(", ")));
+                logger.info("Server bound to " + host + ":" + port + " with " + virtualHosts.size() + " virtual hosts: "
+                        + virtualHosts.stream().map(ServerConfig::getServerName).collect(Collectors.joining(", ")));
+
+            } catch (IOException e) {
+                logger.severe("Failed to bind to " + host + ":" + port + " - " + e.getMessage());
+
+                if (serverSocket != null) {
+                    try {
+                        serverSocket.close();
+                    } catch (IOException ignored) {
+                    }
+                }
+            }
         }
 
         while (true) {
@@ -80,9 +93,22 @@ public class Server {
                         handleWrite(key);
                     }
                 } catch (IOException e) {
-                    logger.severe(e.getMessage());
+                    logger.severe("Client error: " + e.getMessage());
+
+                    // close resources (FileChannel, CGI Process)
+                    Object attachment = key.attachment();
+                    if (attachment instanceof ClientHandler) {
+                        try {
+                            ((ClientHandler) attachment).close();
+                        } catch (IOException closeEx) {
+                        }
+                    }
+
                     key.cancel();
-                    key.channel().close();
+                    try {
+                        key.channel().close();
+                    } catch (IOException ignored) {
+                    }
                 }
             }
         }

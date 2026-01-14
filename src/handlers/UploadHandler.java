@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.UUID;
 
 public class UploadHandler implements Handler {
 
@@ -39,7 +40,9 @@ public class UploadHandler implements Handler {
                     .body("Invalid request: " + e.getMessage());
 
         } catch (Exception e) {
-            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR);
+            e.printStackTrace(); // Log error for debugging
+            response.status(HttpStatusCode.INTERNAL_SERVER_ERROR)
+                    .body("Upload failed: " + e.getMessage());
         }
     }
 
@@ -48,15 +51,19 @@ public class UploadHandler implements Handler {
 
         if (!uploadDir.exists()) {
             uploadDir.mkdirs();
+        } else if (!uploadDir.isDirectory()) {
+            uploadDir = uploadDir.getParentFile();
         }
 
         List<MultipartPart> parts = request.getMultipartParts();
         int savedCount = 0;
 
-        for (MultipartPart part : parts) {
-            if (part.isFile()) {
-                saveFilePart(part, uploadDir);
-                savedCount++;
+        if (parts != null) {
+            for (MultipartPart part : parts) {
+                if (part.isFile()) {
+                    saveFilePart(part, uploadDir);
+                    savedCount++;
+                }
             }
         }
 
@@ -77,6 +84,12 @@ public class UploadHandler implements Handler {
 
         File targetFile = resource;
 
+        if (targetFile.isDirectory()) {
+            String uniqueName = "upload_" + System.currentTimeMillis() + "_"
+                    + UUID.randomUUID().toString().substring(0, 8) + ".bin";
+            targetFile = new File(targetFile, uniqueName);
+        }
+
         if (!isPathSafe(targetFile, route.getRoot())) {
             throw new SecurityException("Path traversal detected");
         }
@@ -91,7 +104,12 @@ public class UploadHandler implements Handler {
                     targetFile.toPath(),
                     StandardCopyOption.REPLACE_EXISTING);
         } else {
-            Files.write(targetFile.toPath(), request.getBody());
+            byte[] body = request.getBody();
+            if (body == null || body.length == 0) {
+                response.status(HttpStatusCode.BAD_REQUEST).body("Empty body");
+                return;
+            }
+            Files.write(targetFile.toPath(), body);
         }
 
         response.status(HttpStatusCode.CREATED)
@@ -107,27 +125,25 @@ public class UploadHandler implements Handler {
             throw new SecurityException("Path traversal in filename: " + part.getFilename());
         }
 
-        Files.move(part.getTempFile().toPath(),
-                targetFile.toPath(),
-                StandardCopyOption.REPLACE_EXISTING);
+        if (part.getTempFile() != null) {
+            Files.move(part.getTempFile().toPath(),
+                    targetFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
+        } else if (part.getContent() != null) {
+            Files.write(targetFile.toPath(), part.getContent());
+        }
     }
 
     private String sanitizeFilename(String filename) {
         if (filename == null || filename.isEmpty()) {
-            throw new IllegalArgumentException("Empty filename");
+            return "unknown_file";
         }
-
         filename = filename.replaceAll(".*[/\\\\]", "");
         filename = filename.replaceAll("[^a-zA-Z0-9._-]", "_");
-
-        if (filename.startsWith(".")) {
+        if (filename.startsWith("."))
             filename = "_" + filename.substring(1);
-        }
-
-        if (filename.isEmpty()) {
-            throw new IllegalArgumentException("Filename invalid after sanitization");
-        }
-
+        if (filename.isEmpty())
+            return "unnamed_file";
         return filename;
     }
 
