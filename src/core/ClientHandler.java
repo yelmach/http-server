@@ -37,12 +37,14 @@ public class ClientHandler {
     private ServerConfig currentConfig;
 
     // CGI
+    private static final int MAX_CGI_OUTPUT = 10 * 1024 * 1024; // 10MB limit
     private Process cgiProcess;
     private boolean isCgiRunning = false;
     private long cgiStartTime;
     private ResponseBuilder pendingResponseBuilder;
     private HttpRequest pendingRequest;
     private ByteArrayOutputStream cgiOutputBuffer;
+    private int cgiOutputSize = 0;
 
     public ClientHandler(SocketChannel clientChannel, SelectionKey selectionKey, List<ServerConfig> virtualHosts) {
         this.client = clientChannel;
@@ -119,6 +121,7 @@ public class ClientHandler {
             this.isCgiRunning = true;
             this.cgiStartTime = System.currentTimeMillis();
             this.cgiOutputBuffer = new ByteArrayOutputStream();
+            this.cgiOutputSize = 0; // Reset size counter
 
             // We pause InterestOps because we are waiting for the Process, not the Socket
             selectionKey.interestOps(0);
@@ -159,7 +162,20 @@ public class ClientHandler {
                 byte[] chunk = new byte[8192];
                 int read = is.read(chunk);
                 if (read > 0) {
+                    // Check size limit BEFORE writing
+                    if (cgiOutputSize + read > MAX_CGI_OUTPUT) {
+                        logger.warning("CGI output exceeds limit (" + MAX_CGI_OUTPUT + " bytes), killing process");
+                        cgiProcess.destroyForcibly();
+                        isCgiRunning = false;
+
+                        pendingResponseBuilder.status(HttpStatusCode.PAYLOAD_TOO_LARGE)
+                                              .body("CGI output too large (max " + MAX_CGI_OUTPUT + " bytes)");
+                        finishRequest(pendingResponseBuilder, pendingRequest);
+                        return;
+                    }
+
                     cgiOutputBuffer.write(chunk, 0, read);
+                    cgiOutputSize += read;
                 }
             }
         } catch (IOException e) {
@@ -184,7 +200,21 @@ public class ClientHandler {
             try {
                 // Read any remaining bytes that arrived
                 InputStream is = cgiProcess.getInputStream();
-                is.transferTo(cgiOutputBuffer);
+
+                // Read remaining data with size checking
+                byte[] chunk = new byte[8192];
+                int read;
+                while ((read = is.read(chunk)) != -1) {
+                    if (cgiOutputSize + read > MAX_CGI_OUTPUT) {
+                        logger.warning("CGI output exceeds limit during final read");
+                        pendingResponseBuilder.status(HttpStatusCode.PAYLOAD_TOO_LARGE)
+                                              .body("CGI output too large (max " + MAX_CGI_OUTPUT + " bytes)");
+                        finishRequest(pendingResponseBuilder, pendingRequest);
+                        return;
+                    }
+                    cgiOutputBuffer.write(chunk, 0, read);
+                    cgiOutputSize += read;
+                }
 
                 byte[] fullOutput = cgiOutputBuffer.toByteArray();
 
