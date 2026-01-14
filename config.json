@@ -60,6 +60,20 @@
           "root": "./www"
         }
       ]
+    },
+    {
+      "host": "127.0.0.2",
+      "ports": [8080],
+      "serverName": "localhost",
+      "maxBodySize": 104857600,
+      "routes": [
+        {
+          "path": "/",
+          "methods": ["GET", "DELETE"],
+          "root": "./www",
+          "index": "index.html"
+        }
+      ]
     }
   ]
 }
