@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
 
 public class UploadHandler implements Handler {
 
@@ -84,19 +83,23 @@ public class UploadHandler implements Handler {
 
         File targetFile = resource;
 
+        // Target must be a file path, not a directory
         if (targetFile.isDirectory()) {
-            String uniqueName = "upload_" + System.currentTimeMillis() + "_"
-                    + UUID.randomUUID().toString().substring(0, 8) + ".bin";
-            targetFile = new File(targetFile, uniqueName);
+            response.status(HttpStatusCode.BAD_REQUEST)
+                    .body("Filename required in path");
+            return;
         }
 
         if (!isPathSafe(targetFile, route.getRoot())) {
             throw new SecurityException("Path traversal detected");
         }
 
+        // Parent directory must exist
         File parentDir = targetFile.getParentFile();
-        if (parentDir != null && !parentDir.exists()) {
-            parentDir.mkdirs();
+        if (parentDir == null || !parentDir.exists() || !parentDir.isDirectory()) {
+            response.status(HttpStatusCode.NOT_FOUND)
+                    .body("Directory not found: " + parentDir.getName());
+            return;
         }
 
         if (request.getBodyTempFile() != null) {

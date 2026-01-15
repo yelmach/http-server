@@ -11,8 +11,7 @@ public class ConfigValidator {
 
     private final static Logger logger = ServerLogger.get();
     private static Set<String> allowed = Set.of("GET", "POST", "DELETE");
-    private static final String IPV4_REGEX
-            = "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}"
+    private static final String IPV4_REGEX = "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}"
             + "(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$";
 
     public static boolean validateGeneralFields(Map<String, Object> json) {
@@ -31,7 +30,7 @@ public class ConfigValidator {
             return false;
         }
 
-        java.util.List servers = (java.util.List) json.get("servers");
+        List<Object> servers = (List<Object>) json.get("servers");
 
         if (servers.size() > 10) {
             logger.severe("you can't use more than 10 servers.");
@@ -157,7 +156,7 @@ public class ConfigValidator {
                     return false;
                 }
 
-                List methodsList = (List) route.get("methods");
+                List<String> methodsList = (List<String>) route.get("methods");
 
                 for (Object m : methodsList) {
                     if (!(m instanceof String) || !allowed.contains(m)) {
@@ -182,6 +181,22 @@ public class ConfigValidator {
                 if (ext != null && (!(ext instanceof String) || !ext.equals("py"))) {
                     logger.severe("Invalid or missing 'cgiExtension' field in route.");
                     return false;
+                }
+
+                // Validate root path based on CGI extension
+                String root = (String) route.get("root");
+                boolean isCgiRoute = ext != null;
+
+                if (isCgiRoute) {
+                    if (!root.startsWith("./scripts")) {
+                        logger.severe("CGI route must have root starting with './scripts': " + path);
+                        return false;
+                    }
+                } else {
+                    if (!root.startsWith("./www")) {
+                        logger.severe("Non-CGI route must have root starting with './www': " + path);
+                        return false;
+                    }
                 }
             }
         } else {

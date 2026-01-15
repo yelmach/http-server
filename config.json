@@ -23,19 +23,19 @@
         },
         {
           "path": "/cgi-1",
-          "root": "./www/scripts/cgi-1.py",
+          "root": "./scripts/cgi-1.py",
           "methods": ["GET"],
           "cgiExtension": "py"
         },
         {
           "path": "/cgi-2",
-          "root": "./www/scripts/cgi-2.py",
+          "root": "./scripts/cgi-2.py",
           "methods": ["GET"],
           "cgiExtension": "py"
         },
         {
           "path": "/cgi-3",
-          "root": "./www/scripts/cgi-3.py",
+          "root": "./scripts/cgi-3.py",
           "methods": ["GET", "POST"],
           "cgiExtension": "py"
         },
